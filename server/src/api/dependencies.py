@@ -1,3 +1,5 @@
+import uuid
+from typing import Annotated
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -100,18 +102,22 @@ async def get_current_user(
     if payload.get("type") != "access":
         raise UnauthorizedError("Invalid token type")
 
-    import uuid
-    user_id_str = payload.get("sub")
-    if not user_id_str:
-        raise UnauthorizedError("Invalid token payload")
-
     try:
-        user_id = uuid.UUID(user_id_str)
-    except ValueError:
-        raise UnauthorizedError("Invalid user ID format in token")
+        user_id = uuid.UUID(payload["sub"])
+    except (ValueError, KeyError):
+        raise UnauthorizedError("Invalid token")
 
-    user = await user_repo.get(user_id)
+    user = await user_repo.find_by_id(user_id)
     if not user:
         raise UnauthorizedError("User not found")
 
     return user
+
+
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+LotServiceDep = Annotated[LotService, Depends(get_lot_service)]
+AuctionServiceDep = Annotated[AuctionService, Depends(get_auction_service)]
+BidServiceDep = Annotated[BidService, Depends(get_bid_service)]
+PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
+CurrentUser = Annotated[User, Depends(get_current_user)]

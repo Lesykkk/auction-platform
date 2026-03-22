@@ -1,3 +1,4 @@
+from decimal import Decimal
 from models.user import User
 from repositories.user_repository import UserRepository
 from schemas.user import UserUpdateRequest, TopUpRequest
@@ -24,11 +25,11 @@ class UserService:
                 raise ConflictError("Email already registered")
             user.email = data.email
 
-        return await self.user_repository.update(user)
+        return await self.user_repository.save(user)
 
     async def top_up_balance(self, user: User, data: TopUpRequest) -> User:
-        if data.amount <= 0:
+        if data.amount <= Decimal("0.0"):
             raise BusinessLogicError("Amount must be positive")
 
         user.balance += data.amount
-        return await self.user_repository.update(user)
+        return await self.user_repository.save(user)

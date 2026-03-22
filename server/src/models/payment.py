@@ -1,7 +1,9 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from decimal import Decimal
+from dataclasses import dataclass
 from enum import Enum
+
+from models.base import UUIDInMemoryMixin, TimeStampInMemoryMixin
 
 
 class PaymentStatus(str, Enum):
@@ -10,10 +12,8 @@ class PaymentStatus(str, Enum):
 
 
 @dataclass
-class Payment:
+class Payment(UUIDInMemoryMixin, TimeStampInMemoryMixin):
     lot_id: uuid.UUID
     user_id: uuid.UUID
-    amount: float
+    amount: Decimal
     status: PaymentStatus
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

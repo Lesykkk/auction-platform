@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, Request, Response
+from typing import Annotated
+from fastapi import APIRouter, Cookie, Response
 
-from api.dependencies import get_auth_service
+from api.dependencies import AuthServiceDep
+from core.config import get_settings
 from exceptions.handlers import UnauthorizedError
 from schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from schemas.user import UserResponse
-from services.auth_service import AuthService
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -12,17 +15,16 @@ router = APIRouter()
 @router.post("/register", response_model=UserResponse)
 async def register(
     data: RegisterRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthServiceDep,
 ):
-    user = await auth_service.register(data)
-    return user
+    return await auth_service.register(data)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
     data: LoginRequest,
     response: Response,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthServiceDep,
 ):
     token_response, refresh_token = await auth_service.login(data)
     response.set_cookie(
@@ -31,19 +33,18 @@ async def login(
         httponly=True,
         secure=True,
         samesite="strict",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     return token_response
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
-    request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthServiceDep,
+    refresh_token: Annotated[str | None, Cookie()] = None,
 ):
-    refresh_token = request.cookies.get("refresh_token")
-    if not refresh_token:
-        raise UnauthorizedError("Refresh token not found")
-
+    if refresh_token is None:
+        raise UnauthorizedError("Missing refresh token")
     return await auth_service.refresh(refresh_token)
 
 

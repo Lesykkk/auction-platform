@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -6,14 +7,14 @@ from pydantic import BaseModel, ConfigDict
 
 class BidCreateRequest(BaseModel):
     lot_id: UUID
-    amount: float
+    amount: Decimal
 
 
 class BidResponse(BaseModel):
     id: UUID
     lot_id: UUID
-    bidder_id: UUID
-    amount: float
+    user_id: UUID
+    amount: Decimal
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -26,6 +26,14 @@ class ForbiddenError(Exception):
     def __init__(self, detail: str):
         self.detail = detail
 
+class TokenExpiredError(UnauthorizedError):
+    pass
+
+
+class TokenInvalidError(UnauthorizedError):
+    pass
+
+
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(NotFoundError)
@@ -37,9 +45,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=409, content={"detail": exc.detail})
 
     @app.exception_handler(BusinessLogicError)
-    async def business_logic_handler(
-        request: Request, exc: BusinessLogicError
-    ):
+    async def business_logic_handler(request: Request, exc: BusinessLogicError):
         return JSONResponse(status_code=422, content={"detail": exc.detail})
 
     @app.exception_handler(UnauthorizedError)

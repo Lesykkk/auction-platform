@@ -1,12 +1,13 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from decimal import Decimal
+from dataclasses import dataclass
+
+from models.base import UUIDInMemoryMixin, TimeStampInMemoryMixin
 
 
 @dataclass
-class Bid:
+class Bid(UUIDInMemoryMixin, TimeStampInMemoryMixin):
     lot_id: uuid.UUID
-    bidder_id: uuid.UUID
-    amount: float
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    user_id: uuid.UUID
+    amount: Decimal
+

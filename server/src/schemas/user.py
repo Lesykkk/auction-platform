@@ -1,15 +1,16 @@
 from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
-from uuid import UUID
 
 
 class UserResponse(BaseModel):
     id: UUID
     username: str
     email: EmailStr
-    balance: float
-    locked_balance: float
+    balance: Decimal
+    locked_balance: Decimal
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -21,4 +22,4 @@ class UserUpdateRequest(BaseModel):
 
 
 class TopUpRequest(BaseModel):
-    amount: float
+    amount: Decimal

@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from api.dependencies import get_current_user, get_payment_service
-from models.user import User
+from api.dependencies import CurrentUser, PaymentServiceDep
 from schemas.payment import PaymentResponse
-from services.payment_service import PaymentService
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[PaymentResponse])
 async def get_payments(
-    user: User = Depends(get_current_user),
-    payment_service: PaymentService = Depends(get_payment_service),
+    user: CurrentUser,
+    payment_service: PaymentServiceDep,
 ):
     return await payment_service.get_user_payments(user)

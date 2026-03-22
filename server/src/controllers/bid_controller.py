@@ -1,17 +1,24 @@
-from fastapi import APIRouter, Depends
+import uuid
+from fastapi import APIRouter, Query
 
-from api.dependencies import get_current_user, get_bid_service
-from models.user import User
+from api.dependencies import CurrentUser, BidServiceDep
 from schemas.bid import BidCreateRequest, BidResponse
-from services.bid_service import BidService
 
 router = APIRouter()
+
+
+@router.get("", response_model=list[BidResponse])
+async def get_bids(
+    bid_service: BidServiceDep,
+    lot_id: uuid.UUID = Query(...),
+):
+    return await bid_service.get_bids_by_lot(lot_id)
 
 
 @router.post("", response_model=BidResponse)
 async def place_bid(
     data: BidCreateRequest,
-    user: User = Depends(get_current_user),
-    bid_service: BidService = Depends(get_bid_service),
+    user: CurrentUser,
+    bid_service: BidServiceDep,
 ):
     return await bid_service.place_bid(data, user)

@@ -1,7 +1,9 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+
+from models.base import UUIDInMemoryMixin, TimeStampInMemoryMixin
 
 
 class AuctionStatus(str, Enum):
@@ -12,11 +14,9 @@ class AuctionStatus(str, Enum):
 
 
 @dataclass
-class Auction:
+class Auction(UUIDInMemoryMixin, TimeStampInMemoryMixin):
     title: str
     description: str
-    created_by: uuid.UUID
+    user_id: uuid.UUID
     closes_at: datetime
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
     status: AuctionStatus = AuctionStatus.PENDING
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,14 +1,14 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from decimal import Decimal
+from dataclasses import dataclass
+
+from models.base import UUIDInMemoryMixin, TimeStampInMemoryMixin
 
 
 @dataclass
-class User:
+class User(UUIDInMemoryMixin, TimeStampInMemoryMixin):
     username: str
     email: str
     hashed_password: str
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
-    balance: float = 0.0
-    locked_balance: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    balance: Decimal = Decimal("0.0")
+    locked_balance: Decimal = Decimal("0.0")

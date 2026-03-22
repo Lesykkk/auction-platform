@@ -19,22 +19,24 @@ Online auction platform — from a monolithic REST API to a microservices system
 - All IDs are `UUID` with `DEFAULT uuidv7()` — globally unique, time-sortable, native in PostgreSQL 18
 - SQLAlchemy relationships use `lazy="raise"` — all joins must be explicit, no implicit N+1 queries
 - Async throughout — FastAPI, SQLAlchemy, Psycopg 3
-- Dependency injection via FastAPI `Depends`
+- Dependency injection via FastAPI `Depends` and Annotated
 - Auth: JWT access token in response body (stored in client memory) + refresh token in `httpOnly` cookie
 - Currently Stage 1: in-memory storage (plain dicts/lists in repositories), no database yet
+- Repository pattern: `AbstractRepository` -> `InMemoryRepository` -> specific repositories
+- Model structure: `UUIDInMemoryMixin` and `TimeStampInMemoryMixin` (dataclass-based)
 - All business logic lives in services only — controllers are thin, repositories are dumb
 
 ## Layer Responsibilities
 
 - **`controllers/`** — HTTP only: accept request schema, call service, return response schema. No logic.
 - **`services/`** — all business logic: validation, status transitions, balance operations
-- **`repositories/`** — data access only: get, get_all, create, update, delete. Currently in-memory.
+- **`repositories/`** — data access only: find_by_id, find_all, save, delete. Currently in-memory.
 - **`schemas/`** — Pydantic request/response models (DTOs)
 - **`models/`** — domain entity classes (plain Python for Stage 1, SQLAlchemy for Stage 2+)
 - **`core/config.py`** — pydantic-settings, reads from environment variables
 - **`core/security.py`** — JWT encode/decode, password hashing via pwdlib argon2
 - **`api/router.py`** — main router, collects all sub-routers with prefixes and tags
-- **`api/dependencies.py`** — FastAPI Depends: get_current_user, get_*_service
+- **`api/dependencies.py`** — FastAPI Annotated Depends - AuthServiceDep, CurrentUser, UserServiceDep..
 - **`exceptions/handlers.py`** — custom exceptions + register_exception_handlers(app)
 
 ## Custom Exceptions
@@ -80,7 +82,7 @@ User    (1) ──< Auction (N) one user creates many auctions
 | description | str |
 | closes_at | datetime |
 | status | AuctionStatus |
-| created_by | UUID (User.id) |
+| user_id | UUID (User.id) |
 | created_at | datetime |
 
 **Lot**
@@ -101,7 +103,7 @@ User    (1) ──< Auction (N) one user creates many auctions
 |-------|------|
 | id | UUID |
 | lot_id | UUID (Lot.id) |
-| bidder_id | UUID (User.id) |
+| user_id | UUID (User.id) |
 | amount | Decimal |
 | created_at | datetime |
 
@@ -174,12 +176,12 @@ All endpoints are prefixed with `/api/v1`.
 | DELETE | `/auctions/{id}` | ✅ | Delete auction (owner only, PENDING only, cascades to lots) |
 | POST | `/auctions/{id}/open` | ✅ | Open auction (owner only) → ACTIVE |
 | POST | `/auctions/{id}/close` | ✅ | Close auction (owner only) → CLOSED |
-| GET | `/auctions/{id}/lots` | ❌ | Get all lots in auction |
-| POST | `/auctions/{id}/lots` | ✅ | Add lot to auction (owner only, PENDING auction only) |
-| GET | `/auctions/{id}/lots/{lot_id}` | ❌ | Get lot by id |
-| PATCH | `/auctions/{id}/lots/{lot_id}` | ✅ | Update lot (owner only, PENDING auction only) |
-| DELETE | `/auctions/{id}/lots/{lot_id}` | ✅ | Delete lot (owner only, PENDING auction only) |
-| GET | `/auctions/{id}/lots/{lot_id}/bids` | ❌ | Get bids for lot |
+| GET | `/lots?auction_id={id}` | ❌ | Get all lots in auction |
+| POST | `/lots` | ✅ | Add lot to auction (owner only, PENDING auction only) |
+| GET | `/lots/{id}` | ❌ | Get lot by id |
+| PATCH | `/lots/{id}` | ✅ | Update lot (owner only, PENDING auction only) |
+| DELETE | `/lots/{id}` | ✅ | Delete lot (owner only, PENDING auction only) |
+| GET | `/bids?lot_id={lot_id}` | ❌ | Get bids for lot |
 | POST | `/bids` | ✅ | Place a bid on a lot |
 | GET | `/payments` | ✅ | Get current user's payments |
 
@@ -191,25 +193,20 @@ All endpoints are prefixed with `/api/v1`.
 - Never raise HTTPException directly — use custom exceptions from `exceptions/handlers.py`
 - Controllers never contain `if` statements for business logic
 
-## In-Memory Storage Pattern
-
-Repositories use a plain dict as storage with UUID as key:
+Repositories inherit from `InMemoryRepository[ModelType]` which uses a plain dict as storage:
 
 ```python
-class UserRepository:
+class InMemoryRepository(AbstractRepository[ModelType]):
     def __init__(self):
-        self._storage: dict[UUID, User] = {}
+        self._storage: dict[uuid.UUID, ModelType] = {}
+
+class UserRepository(InMemoryRepository[User]):
+    pass
 ```
 
 ## Current Implementation Status
 
-- ✅ `main.py`
-- ✅ `core/config.py`
-- ✅ `core/security.py`
-- ✅ `api/router.py`
-- ✅ `api/dependencies.py`
-- ✅ `exceptions/handlers.py`
-- ⏳ models, schemas, repositories, services, controllers — TODO
+- ✅ models, schemas, repositories, services, controllers
 
 ## Project Structure
 
@@ -225,11 +222,11 @@ auction-platform/
 │   │   │   ├── router.py
 │   │   │   └── dependencies.py
 │   │   ├── controllers/
-│   │   │   ├── auth_router.py
-│   │   │   ├── user_router.py
-│   │   │   ├── auction_router.py
-│   │   │   ├── bid_router.py
-│   │   │   └── payment_router.py
+│   │   │   ├── auth_controller.py
+│   │   │   ├── user_controller.py
+│   │   │   ├── auction_controller.py
+│   │   │   ├── bid_controller.py
+│   │   │   └── payment_controller.py
 │   │   ├── services/
 │   │   │   ├── auth_service.py
 │   │   │   ├── user_service.py
@@ -272,7 +269,7 @@ auction-platform/
 
 | Stage | Status | Architecture | Storage | What's added |
 |-------|--------|-------------|---------|--------------|
-| 1 | ✅ In progress | Monolith | In-memory | REST API, CRUD, business logic, auth |
+| 1 | ✅ Done | Monolith | In-memory | REST API, CRUD, business logic, auth |
 | 2 | ⏳ Planned | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
 | 3 | ⏳ Planned | Microservices | PostgreSQL (separate DBs) | REST inter-service communication |
 | 4 | ⏳ Planned | Microservices | PostgreSQL + Redis | Docker, docker-compose, caching |

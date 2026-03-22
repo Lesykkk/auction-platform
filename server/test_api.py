@@ -166,52 +166,55 @@ def run():
     print("\n=== LOTS ===")
 
     if auction_id:
-        r = client.post(f"/auctions/{auction_id}/lots", json={
+        r = client.post("/lots", json={
+            "auction_id": auction_id,
             "title": "Vintage Guitar",
             "description": "1960s Fender Stratocaster in mint condition.",
             "starting_price": 2000,
             "min_bid_increment": 100,
         }, headers=seller_headers)
-        print_result("POST", "/auctions/{id}/lots", r.status_code, r.json(), 200)
+        print_result("POST", "/lots", r.status_code, r.json(), 200)
         if r.status_code == 200:
             lot_id = r.json()["id"]
 
     if auction_id:
-        r = client.post(f"/auctions/{auction_id}/lots", json={
+        r = client.post("/lots", json={
+            "auction_id": auction_id,
             "title": "Rare Painting",
             "description": "Oil on canvas, 18th century.",
             "starting_price": 5000,
             "min_bid_increment": 500,
         }, headers=seller_headers)
-        print_result("POST", "/auctions/{id}/lots (lot2)", r.status_code, r.json(), 200)
+        print_result("POST", "/lots (lot2)", r.status_code, r.json(), 200)
         if r.status_code == 200:
             lot2_id = r.json()["id"]
 
     # Add lot by non-owner
     if auction_id:
-        r = client.post(f"/auctions/{auction_id}/lots", json={
+        r = client.post("/lots", json={
+            "auction_id": auction_id,
             "title": "Hacked lot",
             "description": "Should fail.",
             "starting_price": 100,
             "min_bid_increment": 10,
         }, headers=buyer_headers)
-        print_result("POST", "/auctions/{id}/lots (wrong user, should fail)", r.status_code, r.json(), 403)
+        print_result("POST", "/lots (wrong user, should fail)", r.status_code, r.json(), 403)
 
     if auction_id:
-        r = client.get(f"/auctions/{auction_id}/lots")
-        print_result("GET", "/auctions/{id}/lots", r.status_code, r.json(), 200)
+        r = client.get(f"/lots?auction_id={auction_id}")
+        print_result("GET", "/lots?auction_id={id}", r.status_code, r.json(), 200)
 
-    if auction_id and lot_id:
-        r = client.get(f"/auctions/{auction_id}/lots/{lot_id}")
-        print_result("GET", "/auctions/{id}/lots/{lot_id}", r.status_code, r.json(), 200)
+    if lot_id:
+        r = client.get(f"/lots/{lot_id}")
+        print_result("GET", "/lots/{lot_id}", r.status_code, r.json(), 200)
 
-    if auction_id and lot_id:
-        r = client.patch(f"/auctions/{auction_id}/lots/{lot_id}", json={"title": "Vintage Guitar - Updated"}, headers=seller_headers)
-        print_result("PATCH", "/auctions/{id}/lots/{lot_id} (owner)", r.status_code, r.json(), 200)
+    if lot_id:
+        r = client.patch(f"/lots/{lot_id}", json={"title": "Vintage Guitar - Updated"}, headers=seller_headers)
+        print_result("PATCH", "/lots/{lot_id} (owner)", r.status_code, r.json(), 200)
 
-    if auction_id and lot_id:
-        r = client.patch(f"/auctions/{auction_id}/lots/{lot_id}", json={"title": "Hacked"}, headers=buyer_headers)
-        print_result("PATCH", "/auctions/{id}/lots/{lot_id} (wrong user, should fail)", r.status_code, r.json(), 403)
+    if lot_id:
+        r = client.patch(f"/lots/{lot_id}", json={"title": "Hacked"}, headers=buyer_headers)
+        print_result("PATCH", "/lots/{lot_id} (wrong user, should fail)", r.status_code, r.json(), 403)
 
     print("\n=== OPEN AUCTION ===")
 
@@ -232,13 +235,14 @@ def run():
 
     # Add lot to active auction (should fail)
     if auction_id:
-        r = client.post(f"/auctions/{auction_id}/lots", json={
+        r = client.post("/lots", json={
+            "auction_id": auction_id,
             "title": "Late lot",
             "description": "Should fail, auction is active.",
             "starting_price": 100,
             "min_bid_increment": 10,
         }, headers=seller_headers)
-        print_result("POST", "/auctions/{id}/lots (active auction, should fail)", r.status_code, r.json(), 422)
+        print_result("POST", "/lots (active auction, should fail)", r.status_code, r.json(), 422)
 
     print("\n=== BIDS ===")
 
@@ -270,9 +274,9 @@ def run():
     # intentionally no bids on lot2
 
     # Get bids for lot
-    if auction_id and lot_id:
-        r = client.get(f"/auctions/{auction_id}/lots/{lot_id}/bids")
-        print_result("GET", "/auctions/{id}/lots/{lot_id}/bids", r.status_code, r.json(), 200)
+    if lot_id:
+        r = client.get(f"/bids?lot_id={lot_id}")
+        print_result("GET", "/bids?lot_id={lot_id}", r.status_code, r.json(), 200)
 
     print("\n=== CLOSE AUCTION ===")
 
@@ -292,15 +296,15 @@ def run():
         print_result("POST", "/auctions/{id}/close (already closed, should fail)", r.status_code, r.json(), 422)
 
     # Check lot statuses after close
-    if auction_id and lot_id:
-        r = client.get(f"/auctions/{auction_id}/lots/{lot_id}")
+    if lot_id:
+        r = client.get(f"/lots/{lot_id}")
         body = r.json()
         expected_status_value = "SOLD"
         ok = "✅" if body.get("status") == expected_status_value else "❌"
         print(f"{ok} lot1 status after close → {body.get('status')} (expected SOLD)")
 
-    if auction_id and lot2_id:
-        r = client.get(f"/auctions/{auction_id}/lots/{lot2_id}")
+    if lot2_id:
+        r = client.get(f"/lots/{lot2_id}")
         body = r.json()
         expected_status_value = "UNSOLD"
         ok = "✅" if body.get("status") == expected_status_value else "❌"
@@ -337,7 +341,8 @@ def run():
     if r.status_code == 200:
         test_auction_id = r.json()["id"]
 
-        r = client.post(f"/auctions/{test_auction_id}/lots", json={
+        r = client.post("/lots", json={
+            "auction_id": test_auction_id,
             "title": "Lot to delete",
             "description": "Will be deleted.",
             "starting_price": 100,
@@ -346,14 +351,14 @@ def run():
         if r.status_code == 200:
             delete_lot_id = r.json()["id"]
 
-            r = client.delete(f"/auctions/{test_auction_id}/lots/{delete_lot_id}", headers=buyer_headers)
-            print_result("DELETE", "/auctions/{id}/lots/{lot_id} (wrong user, should fail)", r.status_code, r.json() if r.content else {}, 403)
+            r = client.delete(f"/lots/{delete_lot_id}", headers=buyer_headers)
+            print_result("DELETE", "/lots/{lot_id} (wrong user, should fail)", r.status_code, r.json() if r.content else {}, 403)
 
-            r = client.delete(f"/auctions/{test_auction_id}/lots/{delete_lot_id}", headers=seller_headers)
-            print_result("DELETE", "/auctions/{id}/lots/{lot_id} (owner)", r.status_code, r.json() if r.content else {}, 200)
+            r = client.delete(f"/lots/{delete_lot_id}", headers=seller_headers)
+            print_result("DELETE", "/lots/{lot_id} (owner)", r.status_code, r.json() if r.content else {}, 200)
 
-            r = client.delete(f"/auctions/{test_auction_id}/lots/{delete_lot_id}", headers=seller_headers)
-            print_result("DELETE", "/auctions/{id}/lots/{lot_id} (already deleted, should fail)", r.status_code, r.json() if r.content else {}, 404)
+            r = client.delete(f"/lots/{delete_lot_id}", headers=seller_headers)
+            print_result("DELETE", "/lots/{lot_id} (already deleted, should fail)", r.status_code, r.json() if r.content else {}, 404)
 
     print("\n=== LOGOUT ===")
 

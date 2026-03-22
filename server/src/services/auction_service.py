@@ -8,7 +8,7 @@ from repositories.bid_repository import BidRepository
 from repositories.lot_repository import LotRepository
 from repositories.payment_repository import PaymentRepository
 from repositories.user_repository import UserRepository
-from schemas.auction import AuctionCreateRequest
+from schemas.auction import AuctionCreateRequest, AuctionUpdateRequest
 from exceptions.handlers import (
     NotFoundError,
     ForbiddenError,
@@ -31,10 +31,10 @@ class AuctionService:
         self.user_repository = user_repository
 
     async def get_all(self) -> list[Auction]:
-        return await self.auction_repository.get_all()
+        return await self.auction_repository.find_all()
 
     async def get_by_id(self, auction_id: uuid.UUID) -> Auction:
-        auction = await self.auction_repository.get(auction_id)
+        auction = await self.auction_repository.find_by_id(auction_id)
         if not auction:
             raise NotFoundError("Auction not found")
         return auction
@@ -45,16 +45,16 @@ class AuctionService:
         auction = Auction(
             title=data.title,
             description=data.description,
-            created_by=user.id,
+            user_id=user.id,
             closes_at=data.closes_at,
         )
-        return await self.auction_repository.create(auction)
+        return await self.auction_repository.save(auction)
 
     async def update(
-        self, auction_id: uuid.UUID, data: "AuctionUpdateRequest", user: User,
+        self, auction_id: uuid.UUID, data: AuctionUpdateRequest, user: User,
     ) -> Auction:
         auction = await self.get_by_id(auction_id)
-        if auction.created_by != user.id:
+        if auction.user_id != user.id:
             raise ForbiddenError("Only auction creator can update the auction")
         if auction.status != AuctionStatus.PENDING:
             raise BusinessLogicError("Only PENDING auctions can be updated")
@@ -66,11 +66,11 @@ class AuctionService:
         if data.closes_at is not None:
             auction.closes_at = data.closes_at
 
-        return await self.auction_repository.update(auction)
+        return await self.auction_repository.save(auction)
 
     async def delete(self, auction_id: uuid.UUID, user: User) -> None:
         auction = await self.get_by_id(auction_id)
-        if auction.created_by != user.id:
+        if auction.user_id != user.id:
             raise ForbiddenError("Only auction creator can delete the auction")
         if auction.status != AuctionStatus.PENDING:
             raise BusinessLogicError("Only PENDING auctions can be deleted")
@@ -83,31 +83,31 @@ class AuctionService:
 
     async def open(self, auction_id: uuid.UUID, user: User) -> Auction:
         auction = await self.get_by_id(auction_id)
-        if auction.created_by != user.id:
+        if auction.user_id != user.id:
             raise ForbiddenError("Only auction creator can open the auction")
         if auction.status != AuctionStatus.PENDING:
             raise BusinessLogicError("Only PENDING auctions can be opened")
 
         auction.status = AuctionStatus.ACTIVE
-        await self.auction_repository.update(auction)
+        await self.auction_repository.save(auction)
 
         lots = await self.lot_repository.get_by_auction_id(auction_id)
         for lot in lots:
             if lot.status == LotStatus.PENDING:
                 lot.status = LotStatus.ACTIVE
-                await self.lot_repository.update(lot)
+                await self.lot_repository.save(lot)
 
         return auction
 
     async def close(self, auction_id: uuid.UUID, user: User) -> Auction:
         auction = await self.get_by_id(auction_id)
-        if auction.created_by != user.id:
+        if auction.user_id != user.id:
             raise ForbiddenError("Only auction creator can close the auction")
         if auction.status != AuctionStatus.ACTIVE:
             raise BusinessLogicError("Only ACTIVE auctions can be closed")
 
         auction.status = AuctionStatus.CLOSED
-        await self.auction_repository.update(auction)
+        await self.auction_repository.save(auction)
 
         lots = await self.lot_repository.get_by_auction_id(auction_id)
         for lot in lots:
@@ -117,30 +117,30 @@ class AuctionService:
             bids = await self.bid_repository.get_by_lot_id(lot.id)
             if not bids:
                 lot.status = LotStatus.UNSOLD
-                await self.lot_repository.update(lot)
+                await self.lot_repository.save(lot)
                 continue
 
             # Find the winning bid (highest amount)
             winning_bid = max(bids, key=lambda b: b.amount)
 
             lot.status = LotStatus.SOLD
-            lot.winner_id = winning_bid.bidder_id
-            await self.lot_repository.update(lot)
+            lot.winner_id = winning_bid.user_id
+            await self.lot_repository.save(lot)
 
             # Process winner
-            winner = await self.user_repository.get(winning_bid.bidder_id)
+            winner = await self.user_repository.find_by_id(winning_bid.user_id)
             if winner:
                 winner.balance -= winning_bid.amount
                 winner.locked_balance -= winning_bid.amount
-                await self.user_repository.update(winner)
+                await self.user_repository.save(winner)
 
                 # Credit seller (auction creator)
-                seller = await self.user_repository.get(auction.created_by)
+                seller = await self.user_repository.find_by_id(auction.user_id)
                 if seller:
                     seller.balance += winning_bid.amount
-                    await self.user_repository.update(seller)
+                    await self.user_repository.save(seller)
 
-                await self.payment_repository.create(
+                await self.payment_repository.save(
                     Payment(
                         lot_id=lot.id,
                         user_id=winner.id,
@@ -150,20 +150,20 @@ class AuctionService:
                 )
 
             # Refund other bidders on this lot
-            processed_bidders: set[uuid.UUID] = {winning_bid.bidder_id}
+            processed_bidders: set[uuid.UUID] = {winning_bid.user_id}
             for bid in sorted(bids, key=lambda b: b.amount, reverse=True):
-                if bid.bidder_id in processed_bidders:
+                if bid.user_id in processed_bidders:
                     continue
-                processed_bidders.add(bid.bidder_id)
+                processed_bidders.add(bid.user_id)
 
-                bidder = await self.user_repository.get(bid.bidder_id)
+                bidder = await self.user_repository.find_by_id(bid.user_id)
                 if bidder:
-                    bidder_bids = [b for b in bids if b.bidder_id == bid.bidder_id]
+                    bidder_bids = [b for b in bids if b.user_id == bid.user_id]
                     highest_bid = max(bidder_bids, key=lambda b: b.amount)
                     bidder.locked_balance -= highest_bid.amount
-                    await self.user_repository.update(bidder)
+                    await self.user_repository.save(bidder)
 
-                    await self.payment_repository.create(
+                    await self.payment_repository.save(
                         Payment(
                             lot_id=lot.id,
                             user_id=bidder.id,

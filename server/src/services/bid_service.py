@@ -28,18 +28,18 @@ class BidService:
         self.user_repository = user_repository
 
     async def place_bid(self, data: BidCreateRequest, user: User) -> Bid:
-        lot = await self.lot_repository.get(data.lot_id)
+        lot = await self.lot_repository.find_by_id(data.lot_id)
         if not lot:
             raise NotFoundError("Lot not found")
 
         if lot.status != LotStatus.ACTIVE:
             raise BusinessLogicError("Lot is not active")
 
-        auction = await self.auction_repository.get(lot.auction_id)
+        auction = await self.auction_repository.find_by_id(lot.auction_id)
         if not auction:
             raise NotFoundError("Auction not found")
 
-        if auction.created_by == user.id:
+        if auction.user_id == user.id:
             raise ForbiddenError("Organizer cannot bid on their own auction's lots")
 
         if data.amount <= lot.current_price:
@@ -60,28 +60,28 @@ class BidService:
 
         # Unlock previous bid from this user on this specific lot (if any)
         existing_bids = await self.bid_repository.get_by_lot_id(data.lot_id)
-        user_previous_bids = [b for b in existing_bids if b.bidder_id == user.id]
+        user_previous_bids = [b for b in existing_bids if b.user_id == user.id]
         if user_previous_bids:
             previous_highest = max(user_previous_bids, key=lambda b: b.amount)
             user.locked_balance -= previous_highest.amount
 
         # Lock new bid amount
         user.locked_balance += data.amount
-        await self.user_repository.update(user)
+        await self.user_repository.save(user)
 
         # Update lot current price
         lot.current_price = data.amount
-        await self.lot_repository.update(lot)
+        await self.lot_repository.save(lot)
 
         bid = Bid(
             lot_id=data.lot_id,
-            bidder_id=user.id,
+            user_id=user.id,
             amount=data.amount,
         )
-        return await self.bid_repository.create(bid)
+        return await self.bid_repository.save(bid)
 
     async def get_bids_by_lot(self, lot_id: uuid.UUID) -> list[Bid]:
-        lot = await self.lot_repository.get(lot_id)
+        lot = await self.lot_repository.find_by_id(lot_id)
         if not lot:
             raise NotFoundError("Lot not found")
 

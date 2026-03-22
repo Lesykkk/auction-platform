@@ -4,7 +4,7 @@ import jwt
 from pwdlib import PasswordHash
 
 from core.config import get_settings
-from exceptions.handlers import UnauthorizedError
+from exceptions.handlers import TokenExpiredError, TokenInvalidError
 
 password_hash = PasswordHash.recommended()
 settings = get_settings()
@@ -39,8 +39,12 @@ def create_refresh_token(data: dict) -> str:
 def decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
         )
         return payload
-    except jwt.PyJWTError:
-        raise UnauthorizedError("Invalid or expired token")
+    except jwt.ExpiredSignatureError:
+        raise TokenExpiredError("Token has expired")
+    except (jwt.InvalidTokenError, jwt.PyJWTError):
+        raise TokenInvalidError("Invalid token")

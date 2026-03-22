@@ -22,7 +22,7 @@ class AuctionResponse(BaseModel):
     id: UUID
     title: str
     description: str
-    created_by: UUID
+    user_id: UUID
     status: AuctionStatus
     created_at: datetime
     closes_at: datetime
