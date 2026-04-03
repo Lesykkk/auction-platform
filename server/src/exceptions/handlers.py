@@ -46,7 +46,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(BusinessLogicError)
     async def business_logic_handler(request: Request, exc: BusinessLogicError):
-        return JSONResponse(status_code=422, content={"detail": exc.detail})
+        return JSONResponse(status_code=400, content={"detail": exc.detail})
 
     @app.exception_handler(UnauthorizedError)
     async def unauthorized_handler(request: Request, exc: UnauthorizedError):

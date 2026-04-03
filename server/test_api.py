@@ -102,7 +102,7 @@ def run():
     print_result("POST", "/users/me/top-up (buyer2)", r.status_code, r.json(), 200)
 
     r = client.post("/users/me/top-up", json={"amount": -100}, headers=buyer_headers)
-    print_result("POST", "/users/me/top-up (negative, should fail)", r.status_code, r.json(), 422)
+    print_result("POST", "/users/me/top-up (negative, should fail)", r.status_code, r.json(), 400)
 
     print("\n=== AUCTIONS ===")
 
@@ -231,7 +231,7 @@ def run():
     # Open already active auction
     if auction_id:
         r = client.post(f"/auctions/{auction_id}/open", headers=seller_headers)
-        print_result("POST", "/auctions/{id}/open (already active, should fail)", r.status_code, r.json(), 422)
+        print_result("POST", "/auctions/{id}/open (already active, should fail)", r.status_code, r.json(), 400)
 
     # Add lot to active auction (should fail)
     if auction_id:
@@ -242,7 +242,7 @@ def run():
             "starting_price": 100,
             "min_bid_increment": 10,
         }, headers=seller_headers)
-        print_result("POST", "/lots (active auction, should fail)", r.status_code, r.json(), 422)
+        print_result("POST", "/lots (active auction, should fail)", r.status_code, r.json(), 400)
 
     print("\n=== BIDS ===")
 
@@ -258,7 +258,7 @@ def run():
     # Bid too low increment
     if lot_id:
         r = client.post("/bids", json={"lot_id": lot_id, "amount": 2150}, headers=buyer2_headers)
-        print_result("POST", "/bids (too low increment, should fail)", r.status_code, r.json(), 422)
+        print_result("POST", "/bids (too low increment, should fail)", r.status_code, r.json(), 400)
 
     # Bid without auth
     if lot_id:
@@ -293,7 +293,7 @@ def run():
     # Close already closed
     if auction_id:
         r = client.post(f"/auctions/{auction_id}/close", headers=seller_headers)
-        print_result("POST", "/auctions/{id}/close (already closed, should fail)", r.status_code, r.json(), 422)
+        print_result("POST", "/auctions/{id}/close (already closed, should fail)", r.status_code, r.json(), 400)
 
     # Check lot statuses after close
     if lot_id:
