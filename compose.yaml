@@ -1,40 +1,141 @@
 services:
-  db:
+  # ─── Databases ────────────────────────────────────────────────────────────
+  db-users:
     image: postgres:18-trixie
     restart: always
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-auction_platform}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_users
+      PGDATA: /var/lib/postgresql/data/pgdata
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-auction_platform}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d auction_users"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_users_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
+  db-auctions:
+    image: postgres:18-trixie
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_auctions
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d auction_auctions"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_auctions_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
 
-  server:
+  db-bidding:
+    image: postgres:18-trixie
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_bidding
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d auction_bidding"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_bidding_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+
+  # ─── Services ─────────────────────────────────────────────────────────────
+  user-service:
     build:
-      context: ./server
+      context: ./services/user-service
     restart: always
     depends_on:
-      db:
+      db-users:
         condition: service_healthy
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-auction_platform}
-      - SECRET_KEY=${SECRET_KEY}
+      POSTGRES_HOST: db-users
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_users
+      SECRET_KEY: ${SECRET_KEY}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/user-service/src:/service/src
+
+  auction-service:
+    build:
+      context: ./services/auction-service
+    restart: always
+    depends_on:
+      db-auctions:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: db-auctions
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_auctions
+      SECRET_KEY: ${SECRET_KEY}
+      USER_SERVICE_URL: http://user-service:8001
+      BIDDING_SERVICE_URL: http://bidding-service:8003
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/auction-service/src:/service/src
+
+  bidding-service:
+    build:
+      context: ./services/bidding-service
+    restart: always
+    depends_on:
+      db-bidding:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      auction-service:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: db-bidding
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: auction_bidding
+      SECRET_KEY: ${SECRET_KEY}
+      USER_SERVICE_URL: http://user-service:8001
+      AUCTION_SERVICE_URL: http://auction-service:8002
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services/bidding-service/src:/service/src
+
+  # ─── API Gateway (nginx) ───────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: always
     ports:
       - "8000:8000"
     volumes:
-      - ./server/src:/server/src
+      - ./services/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - user-service
+      - auction-service
+      - bidding-service
 
 volumes:
-  postgres_data:
+  postgres_users_data:
+  postgres_auctions_data:
+  postgres_bidding_data:

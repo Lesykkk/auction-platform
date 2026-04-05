@@ -1,9 +1,0 @@
-.idea
-venv
-__pycache__
-*.pyc
-staticfiles
-.env
-*sqlite3
-media
-*.onnx
