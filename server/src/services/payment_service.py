@@ -1,8 +1,9 @@
 from models.payment import Payment
 from models.user import User
-from repositories.in_memory.payment import PaymentRepository
+from repositories.payment import PaymentRepository
 from schemas.base import PaginationParams
 from schemas.payment import PaymentFilterParams
+from typing import Sequence
 
 
 class PaymentService:
@@ -14,5 +15,5 @@ class PaymentService:
         user: User,
         filters: PaymentFilterParams,
         pagination: PaginationParams,
-    ) -> tuple[list[Payment], int]:
+    ) -> tuple[Sequence[Payment], int]:
         return await self.payment_repository.find_all_by_user_id(user.id, filters, pagination)

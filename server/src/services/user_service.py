@@ -3,7 +3,7 @@ from decimal import Decimal
 from core.security import hash_password
 from exceptions.handlers import ConflictError, BusinessLogicError
 from models.user import User
-from repositories.in_memory.user import UserRepository
+from repositories.user import UserRepository
 from schemas.user import UserUpdateRequest, TopUpRequest, RegisterRequest
 
 

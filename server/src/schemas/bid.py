@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.base import BaseFilterParams
 
@@ -13,7 +13,7 @@ class BidFilterParams(BaseFilterParams):
 
 class BidCreateRequest(BaseModel):
     lot_id: UUID
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=Decimal("999999999999999.99"))
 
 
 class BidResponse(BaseModel):

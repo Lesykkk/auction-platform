@@ -1,13 +1,26 @@
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
+from sqlalchemy import text, func, DateTime
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-@dataclass(kw_only=True)
-class UUIDInMemoryMixin:
-    id: uuid.UUID = field(default_factory=uuid.uuid4)
+class Base(DeclarativeBase):
+    pass
 
 
-@dataclass(kw_only=True)
-class TimeStampInMemoryMixin:
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+class UUIDMixin:
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, 
+        server_default=text("uuidv7()")
+    )
+
+
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+
+class BaseModel(Base, UUIDMixin, TimestampMixin):
+    __abstract__ = True

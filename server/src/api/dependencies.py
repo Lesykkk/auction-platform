@@ -1,55 +1,68 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import decode_token
+from core.database import async_session_maker
 from exceptions.handlers import UnauthorizedError
 from models.user import User
-from repositories.in_memory.user import UserRepository
-from repositories.in_memory.lot import LotRepository
-from repositories.in_memory.auction import AuctionRepository
-from repositories.in_memory.bid import BidRepository
-from repositories.in_memory.payment import PaymentRepository
+
+from repositories.user import UserRepository
+from repositories.lot import LotRepository
+from repositories.auction import AuctionRepository
+from repositories.bid import BidRepository
+from repositories.payment import PaymentRepository
+
 from services.auth_service import AuthService
 from services.user_service import UserService
 from services.lot_service import LotService
 from services.auction_service import AuctionService
 from services.bid_service import BidService
 from services.payment_service import PaymentService
+
 from schemas.base import PaginationParams
 from schemas.auction import AuctionFilterParams
 from schemas.bid import BidFilterParams
 from schemas.lot import LotFilterParams
 from schemas.payment import PaymentFilterParams
 
-user_repository = UserRepository()
-lot_repository = LotRepository()
-auction_repository = AuctionRepository()
-bid_repository = BidRepository()
-payment_repository = PaymentRepository()
-
 security = HTTPBearer()
 
 
-def get_user_repository() -> UserRepository:
-    return user_repository
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as db:
+        try:
+            yield db
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
 
 
-def get_lot_repository() -> LotRepository:
-    return lot_repository
+DbDep = Annotated[AsyncSession, Depends(get_db_session)]
 
 
-def get_auction_repository() -> AuctionRepository:
-    return auction_repository
+def get_user_repository(db: DbDep) -> UserRepository:
+    return UserRepository(db)
 
 
-def get_bid_repository() -> BidRepository:
-    return bid_repository
+def get_lot_repository(db: DbDep) -> LotRepository:
+    return LotRepository(db)
 
 
-def get_payment_repository() -> PaymentRepository:
-    return payment_repository
+def get_auction_repository(db: DbDep) -> AuctionRepository:
+    return AuctionRepository(db)
+
+
+def get_bid_repository(db: DbDep) -> BidRepository:
+    return BidRepository(db)
+
+
+def get_payment_repository(db: DbDep) -> PaymentRepository:
+    return PaymentRepository(db)
+
 
 
 def get_auth_service(
@@ -124,6 +137,7 @@ def get_pagination_params(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> PaginationParams:
     return PaginationParams(page=page, limit=limit)
+
 
 PaginationParamsDep = Annotated[PaginationParams, Depends(get_pagination_params)]
 

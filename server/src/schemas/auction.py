@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from models.auction import AuctionStatus
 from schemas.base import BaseFilterParams
@@ -12,14 +12,14 @@ class AuctionFilterParams(BaseFilterParams):
 
 
 class AuctionCreateRequest(BaseModel):
-    title: str
-    description: str
+    title: str = Field(min_length=5, max_length=255)
+    description: str = Field(min_length=10, max_length=2000)
     closes_at: datetime
 
 
 class AuctionUpdateRequest(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str | None = Field(None, min_length=5, max_length=255)
+    description: str | None = Field(None, min_length=10, max_length=2000)
     closes_at: datetime | None = None
 
 

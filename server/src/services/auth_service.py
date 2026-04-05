@@ -6,7 +6,7 @@ from core.security import (
     decode_token,
 )
 from exceptions.handlers import UnauthorizedError
-from repositories.in_memory.user import UserRepository
+from repositories.user import UserRepository
 from schemas.auth import LoginRequest, TokenResponse
 
 

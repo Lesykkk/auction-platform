@@ -1,5 +1,5 @@
 import math
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Sequence
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -29,7 +29,7 @@ class Meta(BaseModel):
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    items: list[T]
+    items: Sequence[T]
     meta: Meta
 
 

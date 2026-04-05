@@ -102,7 +102,7 @@ def run():
     print_result("POST", "/users/me/top-up (buyer2)", r.status_code, r.json(), 200)
 
     r = client.post("/users/me/top-up", json={"amount": -100}, headers=buyer_headers)
-    print_result("POST", "/users/me/top-up (negative, should fail)", r.status_code, r.json(), 400)
+    print_result("POST", "/users/me/top-up (negative, should fail)", r.status_code, r.json(), 422)
 
     print("\n=== AUCTIONS ===")
 

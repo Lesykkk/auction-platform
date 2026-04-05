@@ -4,12 +4,13 @@ from exceptions.handlers import NotFoundError, ForbiddenError, BusinessLogicErro
 from models.bid import Bid
 from models.lot import LotStatus
 from models.user import User
-from repositories.in_memory.auction import AuctionRepository
-from repositories.in_memory.bid import BidRepository
-from repositories.in_memory.lot import LotRepository
-from repositories.in_memory.user import UserRepository
+from repositories.auction import AuctionRepository
+from repositories.bid import BidRepository
+from repositories.lot import LotRepository
+from repositories.user import UserRepository
 from schemas.base import PaginationParams
 from schemas.bid import BidCreateRequest, BidFilterParams
+from typing import Sequence
 
 
 class BidService:
@@ -30,7 +31,7 @@ class BidService:
         lot_id: uuid.UUID,
         filters: BidFilterParams,
         pagination: PaginationParams,
-    ) -> tuple[list[Bid], int]:
+    ) -> tuple[Sequence[Bid], int]:
         lot = await self.lot_repository.find_by_id(lot_id)
         if not lot:
             raise NotFoundError("Lot not found")

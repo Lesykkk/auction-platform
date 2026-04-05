@@ -2,14 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from schemas.base import BaseFilterParams
 
 
 class UserFilterParams(BaseFilterParams):
-    username: str | None = None
-    email: EmailStr | None = None
+    username: str | None = Field(None, min_length=3, max_length=50)
+    email: EmailStr | None = Field(None, max_length=255)
 
 
 class UserResponse(BaseModel):
@@ -24,15 +24,15 @@ class UserResponse(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
+    username: str = Field(min_length=3, max_length=50)
+    email: EmailStr = Field(max_length=255)
+    password: str = Field(min_length=8, max_length=255)
 
 
 class UserUpdateRequest(BaseModel):
-    username: str | None = None
-    email: EmailStr | None = None
+    username: str | None = Field(None, min_length=3, max_length=50)
+    email: EmailStr | None = Field(None, max_length=255)
 
 
 class TopUpRequest(BaseModel):
-    amount: Decimal
+    amount: Decimal = Field(gt=0, le=Decimal("999999999999999.99"))

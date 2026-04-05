@@ -5,13 +5,14 @@ from models.auction import Auction, AuctionStatus
 from models.lot import LotStatus
 from models.payment import Payment, PaymentStatus
 from models.user import User
-from repositories.in_memory.auction import AuctionRepository
-from repositories.in_memory.bid import BidRepository
-from repositories.in_memory.lot import LotRepository
-from repositories.in_memory.payment import PaymentRepository
-from repositories.in_memory.user import UserRepository
+from repositories.auction import AuctionRepository
+from repositories.bid import BidRepository
+from repositories.lot import LotRepository
+from repositories.payment import PaymentRepository
+from repositories.user import UserRepository
 from schemas.auction import AuctionCreateRequest, AuctionUpdateRequest, AuctionFilterParams
 from schemas.base import PaginationParams
+from typing import Sequence
 
 
 class AuctionService:
@@ -33,7 +34,7 @@ class AuctionService:
         self,
         filters: AuctionFilterParams,
         pagination: PaginationParams,
-    ) -> tuple[list[Auction], int]:
+    ) -> tuple[Sequence[Auction], int]:
         return await self.auction_repository.find_all(filters=filters, pagination=pagination)
 
     async def get_by_id(self, auction_id: uuid.UUID) -> Auction:

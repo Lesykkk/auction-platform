@@ -5,10 +5,11 @@ from exceptions.handlers import NotFoundError, ForbiddenError, BusinessLogicErro
 from models.auction import AuctionStatus
 from models.lot import Lot, LotStatus
 from models.user import User
-from repositories.in_memory.auction import AuctionRepository
-from repositories.in_memory.lot import LotRepository
+from repositories.auction import AuctionRepository
+from repositories.lot import LotRepository
 from schemas.base import PaginationParams
 from schemas.lot import LotCreateRequest, LotUpdateRequest, LotFilterParams
+from typing import Sequence
 
 
 class LotService:
@@ -31,7 +32,7 @@ class LotService:
         auction_id: uuid.UUID,
         filters: LotFilterParams,
         pagination: PaginationParams,
-    ) -> tuple[list[Lot], int]:
+    ) -> tuple[Sequence[Lot], int]:
         return await self.lot_repository.find_all_by_auction_id(auction_id, filters, pagination)
 
     async def create(self, data: LotCreateRequest, organizer: User) -> Lot:
@@ -48,6 +49,7 @@ class LotService:
             raise BusinessLogicError("Min bid increment must be positive")
 
         lot = Lot(**data.model_dump())
+        lot.current_price = data.starting_price
         return await self.lot_repository.save(lot)
 
     async def update(self, lot_id: uuid.UUID, data: LotUpdateRequest, user: User) -> Lot:
