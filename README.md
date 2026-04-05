@@ -21,23 +21,24 @@ Online auction platform — from a monolithic REST API to a microservices system
 - Async throughout — FastAPI, SQLAlchemy, Psycopg 3
 - Dependency injection via FastAPI `Depends` and Annotated
 - Auth: JWT access token in response body (stored in client memory) + refresh token in `httpOnly` cookie
-- Currently Stage 1: in-memory storage (plain dicts/lists in repositories), no database yet
-- Repository pattern: `AbstractRepository` → `InMemoryRepository` (in `repositories/in_memory/`) → specific repositories
-- Repositories have two method types: paginated (`find_all_by_*`) for API, unpaginated (`find_*_by_*`) for internal business logic
+- **Currently Stage 2:** PostgreSQL storage via SQLAlchemy 2.0.
+- Repository pattern: `SQLAlchemyRepository` (in `repositories/base.py`) → specific repositories
+- Repositories have two method types: paginated (`find_all`) for API, unpaginated domain-specific methods for internal business logic
 - All business logic lives in services only — controllers are thin, repositories are dumb
 
 ## Layer Responsibilities
 
 - **`controllers/`** — HTTP only: accept request schema, call service, return response schema. No logic.
 - **`services/`** — all business logic: validation, status transitions, balance operations
-- **`repositories/`** — data access only: find_by_id, find_all, save, delete. Currently in-memory.
+- **`repositories/`** — data access only: CRUD operations via SQLAlchemy.
 - **`schemas/`** — Pydantic request/response models (DTOs)
-- **`models/`** — domain entity classes (plain Python for Stage 1, SQLAlchemy for Stage 2+)
+- **`models/`** — SQLAlchemy declarative models
 - **`core/config.py`** — pydantic-settings, reads from environment variables
 - **`core/security.py`** — JWT encode/decode, password hashing via pwdlib argon2
 - **`api/router.py`** — main router, collects all sub-routers with prefixes and tags
 - **`api/dependencies.py`** — FastAPI Annotated Depends - AuthServiceDep, CurrentUser, UserServiceDep..
 - **`exceptions/handlers.py`** — custom exceptions + register_exception_handlers(app)
+- **`core/database.py`** — SQLAlchemy engine and session configuration
 
 ## Custom Exceptions
 
@@ -196,21 +197,29 @@ All endpoints are prefixed with `/api/v1`.
 - `BaseFilterParams` uses `extra="forbid"`
 - `PaginatedResponse` uses `items` (not `data`) + `meta` with auto-computed `total_pages`
 
-Repositories inherit from `InMemoryRepository[ModelType]` which uses a plain dict as storage:
+Repositories inherit from `SQLAlchemyRepository[ModelType, FilterType]` which uses `AsyncSession`:
 
 ```python
-class InMemoryRepository(AbstractRepository[ModelType]):
-    def __init__(self):
-        self._storage: dict[uuid.UUID, ModelType] = {}
+class SQLAlchemyRepository(Generic[ModelType, FilterType]):
+    def __init__(self, db: AsyncSession, model: type[ModelType]):
+        self.db = db
+        self.model = model
 
-# Domain-specific methods:
-# find_all_by_*(context_id, filters, pagination) → (list, total)  ← for API (paginated)
-# find_*_by_*(context_id) → list | model                          ← for business logic (unpaginated)
+# Standard methods:
+# find_by_id(id) -> model
+# find_all(filters, pagination) -> (list, total)
+# save(entity) -> model
+# delete(id) -> None
 ```
 
 ## Current Implementation Status
 
-- ✅ models, schemas, repositories, services, controllers
+- ✅ REST API (FastAPI)
+- ✅ PostgreSQL 18 integration
+- ✅ SQLAlchemy 2.0 (Async)
+- ✅ Alembic Migrations
+- ✅ Business Logic (Auctions, Lots, Bids, Payments)
+- ✅ Authentication (JWT + Refresh Tokens)
 
 ## Project Structure
 
@@ -221,52 +230,28 @@ auction-platform/
 │   │   ├── main.py
 │   │   ├── core/
 │   │   │   ├── config.py
-│   │   │   └── security.py
+│   │   │   ├── database.py              ← DB Engine/Session
+│   │   │   ├── security.py
+│   │   │   └── seed.py                  ← DB Seeding
 │   │   ├── api/
 │   │   │   ├── router.py
 │   │   │   └── dependencies.py
-│   │   ├── controllers/
-│   │   │   ├── auth_controller.py
-│   │   │   ├── user_controller.py
-│   │   │   ├── auction_controller.py
-│   │   │   ├── bid_controller.py
-│   │   │   └── payment_controller.py
-│   │   ├── services/
-│   │   │   ├── auth_service.py
-│   │   │   ├── user_service.py
-│   │   │   ├── auction_service.py
-│   │   │   ├── bid_service.py
-│   │   │   └── payment_service.py
+│   │   ├── controllers/                 ← HTTP Handlers
+│   │   ├── services/                    ← Business Logic
 │   │   ├── repositories/
-│   │   │   ├── base.py                  ← AbstractRepository
-│   │   │   └── in_memory/
-│   │   │       ├── base.py              ← InMemoryRepository
-│   │   │       ├── user.py
-│   │   │       ├── auction.py
-│   │   │       ├── lot.py
-│   │   │       ├── bid.py
-│   │   │       └── payment.py
-│   │   ├── models/
+│   │   │   ├── base.py                  ← SQLAlchemyRepository
 │   │   │   ├── user.py
 │   │   │   ├── auction.py
 │   │   │   ├── lot.py
 │   │   │   ├── bid.py
 │   │   │   └── payment.py
-│   │   ├── schemas/
-│   │   │   ├── auth.py
-│   │   │   ├── user.py
-│   │   │   ├── auction.py
-│   │   │   ├── lot.py
-│   │   │   ├── bid.py
-│   │   │   └── payment.py
+│   │   ├── models/                      ← SQLAlchemy Models
+│   │   ├── schemas/                     ← Pydantic DTOs
 │   │   ├── exceptions/
 │   │   │   └── handlers.py
-│   │   └── migrations/
-│   │       ├── versions/
-│   │       └── env.py
+│   │   └── migrations/                  ← Alembic Migrations
 │   ├── alembic.ini
 │   └── requirements.txt
-├── client/                  ← React (future)
 ├── .env
 ├── compose.yaml
 └── README.md
@@ -277,7 +262,7 @@ auction-platform/
 | Stage | Status | Architecture | Storage | What's added |
 |-------|--------|-------------|---------|--------------|
 | 1 | ✅ Done | Monolith | In-memory | REST API, CRUD, business logic, auth |
-| 2 | ⏳ Planned | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
+| 2 | ✅ Done | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
 | 3 | ⏳ Planned | Microservices | PostgreSQL (separate DBs) | REST inter-service communication |
 | 4 | ⏳ Planned | Microservices | PostgreSQL + Redis | Docker, docker-compose, caching |
 | 5 | ⏳ Planned | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
