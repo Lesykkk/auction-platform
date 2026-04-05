@@ -4,20 +4,11 @@ from fastapi import APIRouter, Cookie, Response
 from api.dependencies import AuthServiceDep
 from core.config import get_settings
 from exceptions.handlers import UnauthorizedError
-from schemas.auth import RegisterRequest, LoginRequest, TokenResponse
-from schemas.user import UserResponse
+from schemas.auth import LoginRequest, TokenResponse
 
 settings = get_settings()
 
 router = APIRouter()
-
-
-@router.post("/register", response_model=UserResponse)
-async def register(
-    data: RegisterRequest,
-    auth_service: AuthServiceDep,
-):
-    return await auth_service.register(data)
 
 
 @router.post("/login", response_model=TokenResponse)

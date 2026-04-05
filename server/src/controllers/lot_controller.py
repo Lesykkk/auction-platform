@@ -1,18 +1,25 @@
 import uuid
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
-from api.dependencies import CurrentUser, LotServiceDep
+from api.dependencies import CurrentUser, LotServiceDep, PaginationParamsDep, LotFilterParamsDep
 from schemas.lot import LotCreateRequest, LotUpdateRequest, LotResponse
+from schemas.base import PaginatedResponse, Meta
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[LotResponse])
+@router.get("", response_model=PaginatedResponse[LotResponse])
 async def get_lots(
     lot_service: LotServiceDep,
+    pagination: PaginationParamsDep,
+    filters: LotFilterParamsDep,
     auction_id: uuid.UUID = Query(...),
 ):
-    return await lot_service.get_by_auction_id(auction_id)
+    items, total = await lot_service.get_by_auction_id(auction_id, filters, pagination)
+    return PaginatedResponse(
+        items=items,
+        meta=Meta(total=total, page=pagination.page, limit=pagination.limit),
+    )
 
 
 @router.post("", response_model=LotResponse)

@@ -1,9 +1,15 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict
+
 from models.payment import PaymentStatus
+from schemas.base import BaseFilterParams
+
+
+class PaymentFilterParams(BaseFilterParams):
+    status: PaymentStatus | None = None
 
 
 class PaymentResponse(BaseModel):

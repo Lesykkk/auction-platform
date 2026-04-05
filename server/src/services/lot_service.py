@@ -1,16 +1,22 @@
 import uuid
 from decimal import Decimal
-from models.lot import Lot, LotStatus
-from models.auction import AuctionStatus
-from models.user import User
-from repositories.lot_repository import LotRepository
-from repositories.auction_repository import AuctionRepository
-from schemas.lot import LotCreateRequest, LotUpdateRequest
+
 from exceptions.handlers import NotFoundError, ForbiddenError, BusinessLogicError
+from models.auction import AuctionStatus
+from models.lot import Lot, LotStatus
+from models.user import User
+from repositories.in_memory.auction import AuctionRepository
+from repositories.in_memory.lot import LotRepository
+from schemas.base import PaginationParams
+from schemas.lot import LotCreateRequest, LotUpdateRequest, LotFilterParams
 
 
 class LotService:
-    def __init__(self, lot_repository: LotRepository, auction_repository: AuctionRepository):
+    def __init__(
+        self,
+        lot_repository: LotRepository,
+        auction_repository: AuctionRepository,
+    ):
         self.lot_repository = lot_repository
         self.auction_repository = auction_repository
 
@@ -20,41 +26,37 @@ class LotService:
             raise NotFoundError("Lot not found")
         return lot
 
-    async def get_by_auction_id(self, auction_id: uuid.UUID) -> list[Lot]:
-        return await self.lot_repository.get_by_auction_id(auction_id)
+    async def get_by_auction_id(
+        self,
+        auction_id: uuid.UUID,
+        filters: LotFilterParams,
+        pagination: PaginationParams,
+    ) -> tuple[list[Lot], int]:
+        return await self.lot_repository.find_all_by_auction_id(auction_id, filters, pagination)
 
     async def create(self, data: LotCreateRequest, organizer: User) -> Lot:
         auction = await self.auction_repository.find_by_id(data.auction_id)
         if not auction:
             raise NotFoundError("Auction not found")
-
         if auction.user_id != organizer.id:
             raise ForbiddenError("Only the auction organizer can add lots")
-
         if auction.status != AuctionStatus.PENDING:
             raise BusinessLogicError("Lots can only be added to PENDING auctions")
-
         if data.starting_price <= Decimal("0.0"):
             raise BusinessLogicError("Starting price must be positive")
-
         if data.min_bid_increment <= Decimal("0.0"):
             raise BusinessLogicError("Min bid increment must be positive")
 
         lot = Lot(**data.model_dump())
         return await self.lot_repository.save(lot)
 
-    async def update(
-        self, lot_id: uuid.UUID, data: LotUpdateRequest, user: User,
-    ) -> Lot:
+    async def update(self, lot_id: uuid.UUID, data: LotUpdateRequest, user: User) -> Lot:
         lot = await self.get_by_id(lot_id)
         auction = await self.auction_repository.find_by_id(lot.auction_id)
-        
         if not auction:
             raise NotFoundError("Auction not found")
-
         if auction.user_id != user.id:
             raise ForbiddenError("Only the organizer can update this lot")
-
         if lot.status != LotStatus.PENDING:
             raise BusinessLogicError("Only PENDING lots can be updated")
 
@@ -76,13 +78,10 @@ class LotService:
     async def delete(self, lot_id: uuid.UUID, user: User) -> None:
         lot = await self.get_by_id(lot_id)
         auction = await self.auction_repository.find_by_id(lot.auction_id)
-
         if not auction:
             raise NotFoundError("Auction not found")
-
         if auction.user_id != user.id:
             raise ForbiddenError("Only the organizer can delete this lot")
-
         if lot.status != LotStatus.PENDING:
             raise BusinessLogicError("Only PENDING lots can be deleted")
 

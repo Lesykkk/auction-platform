@@ -3,7 +3,7 @@ from fastapi import FastAPI
 
 from api.router import router
 from exceptions.handlers import register_exception_handlers
-from core.seed import seed_data
+from core.seed_in_memory import seed_data
 
 
 @asynccontextmanager

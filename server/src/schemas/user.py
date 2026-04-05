@@ -4,6 +4,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
+from schemas.base import BaseFilterParams
+
+
+class UserFilterParams(BaseFilterParams):
+    username: str | None = None
+    email: EmailStr | None = None
+
 
 class UserResponse(BaseModel):
     id: UUID
@@ -14,6 +21,12 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
 
 
 class UserUpdateRequest(BaseModel):

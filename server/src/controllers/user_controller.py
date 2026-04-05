@@ -1,8 +1,16 @@
 from fastapi import APIRouter
 from api.dependencies import CurrentUser, UserServiceDep
-from schemas.user import UserResponse, UserUpdateRequest, TopUpRequest
+from schemas.user import UserResponse, UserUpdateRequest, TopUpRequest, RegisterRequest
 
 router = APIRouter()
+
+
+@router.post("/register", response_model=UserResponse)
+async def register(
+    data: RegisterRequest,
+    user_service: UserServiceDep,
+):
+    return await user_service.register(data)
 
 
 @router.get("/me", response_model=UserResponse)

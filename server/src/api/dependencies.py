@@ -1,22 +1,27 @@
 import uuid
 from typing import Annotated
-from fastapi import Depends
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.security import decode_token
 from exceptions.handlers import UnauthorizedError
 from models.user import User
-from repositories.user_repository import UserRepository
-from repositories.lot_repository import LotRepository
-from repositories.auction_repository import AuctionRepository
-from repositories.bid_repository import BidRepository
-from repositories.payment_repository import PaymentRepository
+from repositories.in_memory.user import UserRepository
+from repositories.in_memory.lot import LotRepository
+from repositories.in_memory.auction import AuctionRepository
+from repositories.in_memory.bid import BidRepository
+from repositories.in_memory.payment import PaymentRepository
 from services.auth_service import AuthService
 from services.user_service import UserService
 from services.lot_service import LotService
 from services.auction_service import AuctionService
 from services.bid_service import BidService
 from services.payment_service import PaymentService
+from schemas.base import PaginationParams
+from schemas.auction import AuctionFilterParams
+from schemas.bid import BidFilterParams
+from schemas.lot import LotFilterParams
+from schemas.payment import PaymentFilterParams
 
 user_repository = UserRepository()
 lot_repository = LotRepository()
@@ -114,10 +119,24 @@ async def get_current_user(
     return user
 
 
+def get_pagination_params(
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> PaginationParams:
+    return PaginationParams(page=page, limit=limit)
+
+PaginationParamsDep = Annotated[PaginationParams, Depends(get_pagination_params)]
+
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 LotServiceDep = Annotated[LotService, Depends(get_lot_service)]
 AuctionServiceDep = Annotated[AuctionService, Depends(get_auction_service)]
 BidServiceDep = Annotated[BidService, Depends(get_bid_service)]
 PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+AuctionFilterParamsDep = Annotated[AuctionFilterParams, Depends()]
+BidFilterParamsDep = Annotated[BidFilterParams, Depends()]
+LotFilterParamsDep = Annotated[LotFilterParams, Depends()]
+PaymentFilterParamsDep = Annotated[PaymentFilterParams, Depends()]

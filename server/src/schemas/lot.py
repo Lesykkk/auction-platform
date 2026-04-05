@@ -5,6 +5,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from models.lot import LotStatus
+from schemas.base import BaseFilterParams
+
+
+class LotFilterParams(BaseFilterParams):
+    status: LotStatus | None = None
 
 
 class LotCreateRequest(BaseModel):

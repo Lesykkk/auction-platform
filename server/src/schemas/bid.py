@@ -4,6 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from schemas.base import BaseFilterParams
+
+
+class BidFilterParams(BaseFilterParams):
+    pass
+
 
 class BidCreateRequest(BaseModel):
     lot_id: UUID

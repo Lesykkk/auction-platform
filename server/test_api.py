@@ -30,34 +30,34 @@ def run():
 
     print("\n=== AUTH ===")
 
-    r = client.post("/auth/register", json={
+    r = client.post("/users/register", json={
         "username": "buyer1",
         "email": "buyer1@example.com",
         "password": "buyer1pass",
     })
-    print_result("POST", "/auth/register (buyer1)", r.status_code, r.json(), 200)
+    print_result("POST", "/users/register (buyer1)", r.status_code, r.json(), 200)
 
-    r = client.post("/auth/register", json={
+    r = client.post("/users/register", json={
         "username": "buyer2",
         "email": "buyer2@example.com",
         "password": "buyer2pass",
     })
-    print_result("POST", "/auth/register (buyer2)", r.status_code, r.json(), 200)
+    print_result("POST", "/users/register (buyer2)", r.status_code, r.json(), 200)
 
-    r = client.post("/auth/register", json={
+    r = client.post("/users/register", json={
         "username": "seller1",
         "email": "seller1@example.com",
         "password": "seller1pass",
     })
-    print_result("POST", "/auth/register (seller)", r.status_code, r.json(), 200)
+    print_result("POST", "/users/register (seller)", r.status_code, r.json(), 200)
 
     # Duplicate
-    r = client.post("/auth/register", json={
+    r = client.post("/users/register", json={
         "username": "buyer1",
         "email": "buyer1@example.com",
         "password": "buyer1pass",
     })
-    print_result("POST", "/auth/register (duplicate, should fail)", r.status_code, r.json(), 409)
+    print_result("POST", "/users/register (duplicate, should fail)", r.status_code, r.json(), 409)
 
     r = client.post("/auth/login", json={"username": "seller1", "password": "seller1pass"})
     print_result("POST", "/auth/login (seller)", r.status_code, r.json(), 200)
@@ -315,7 +315,7 @@ def run():
     r = client.get("/payments", headers=buyer_headers)
     print_result("GET", "/payments (buyer1)", r.status_code, r.json(), 200)
     if r.status_code == 200:
-        payments = r.json()
+        payments = r.json().get("items", [])
         refunded = [p for p in payments if p["status"] == "REFUNDED"]
         ok = "✅" if len(refunded) >= 1 else "❌"
         print(f"{ok} buyer1 has REFUNDED payment (outbid) → {len(refunded)} found")
@@ -323,7 +323,7 @@ def run():
     r = client.get("/payments", headers=buyer2_headers)
     print_result("GET", "/payments (buyer2)", r.status_code, r.json(), 200)
     if r.status_code == 200:
-        payments = r.json()
+        payments = r.json().get("items", [])
         completed = [p for p in payments if p["status"] == "COMPLETED"]
         ok = "✅" if len(completed) >= 1 else "❌"
         print(f"{ok} buyer2 has COMPLETED payment (winner) → {len(completed)} found")

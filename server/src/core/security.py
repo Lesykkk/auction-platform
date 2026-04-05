@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -36,7 +37,7 @@ def create_refresh_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(
             token,

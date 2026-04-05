@@ -4,6 +4,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from models.auction import AuctionStatus
+from schemas.base import BaseFilterParams
+
+
+class AuctionFilterParams(BaseFilterParams):
+    status: AuctionStatus | None = None
 
 
 class AuctionCreateRequest(BaseModel):

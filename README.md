@@ -22,8 +22,8 @@ Online auction platform — from a monolithic REST API to a microservices system
 - Dependency injection via FastAPI `Depends` and Annotated
 - Auth: JWT access token in response body (stored in client memory) + refresh token in `httpOnly` cookie
 - Currently Stage 1: in-memory storage (plain dicts/lists in repositories), no database yet
-- Repository pattern: `AbstractRepository` -> `InMemoryRepository` -> specific repositories
-- Model structure: `UUIDInMemoryMixin` and `TimeStampInMemoryMixin` (dataclass-based)
+- Repository pattern: `AbstractRepository` → `InMemoryRepository` (in `repositories/in_memory/`) → specific repositories
+- Repositories have two method types: paginated (`find_all_by_*`) for API, unpaginated (`find_*_by_*`) for internal business logic
 - All business logic lives in services only — controllers are thin, repositories are dumb
 
 ## Layer Responsibilities
@@ -44,7 +44,7 @@ Online auction platform — from a monolithic REST API to a microservices system
 Defined in `exceptions/handlers.py`:
 - `NotFoundError` → 404
 - `ConflictError` → 409
-- `BusinessLogicError` → 422
+- `BusinessLogicError` → 400
 - `UnauthorizedError` → 401
 - `ForbiddenError` → 403
 
@@ -151,9 +151,9 @@ User    (1) ──< Auction (N) one user creates many auctions
 available_balance = balance - locked_balance
 
 Place bid:    locked_balance += bid_amount
-Outbid:       locked_balance -= previous_bid_amount
+Re-bid:       locked_balance -= user's previous bid on this lot, locked_balance += new_bid_amount
 Win:          balance -= bid_amount, locked_balance -= bid_amount
-Lose/Refund:  locked_balance -= bid_amount
+Lose/Refund:  locked_balance -= bid_amount (highest bid of the user on this lot)
 ```
 
 ## API Endpoints
@@ -162,10 +162,10 @@ All endpoints are prefixed with `/api/v1`.
 
 | Method | URL | Auth | Description |
 |--------|-----|------|-------------|
-| POST | `/auth/register` | ❌ | Register new user |
 | POST | `/auth/login` | ❌ | Login, returns access token + sets refresh cookie |
 | POST | `/auth/refresh` | 🍪 | Refresh access token |
 | POST | `/auth/logout` | ✅ | Logout, clears refresh cookie |
+| POST | `/users/register` | ❌ | Register new user |
 | GET | `/users/me` | ✅ | Get current user |
 | PATCH | `/users/me` | ✅ | Update current user |
 | POST | `/users/me/top-up` | ✅ | Top up balance |
@@ -192,6 +192,9 @@ All endpoints are prefixed with `/api/v1`.
 - Repositories work with domain models internally
 - Never raise HTTPException directly — use custom exceptions from `exceptions/handlers.py`
 - Controllers never contain `if` statements for business logic
+- Service collection methods follow the signature: `(context_id, filters, pagination)` — filters always before pagination
+- `BaseFilterParams` uses `extra="forbid"`
+- `PaginatedResponse` uses `items` (not `data`) + `meta` with auto-computed `total_pages`
 
 Repositories inherit from `InMemoryRepository[ModelType]` which uses a plain dict as storage:
 
@@ -200,8 +203,9 @@ class InMemoryRepository(AbstractRepository[ModelType]):
     def __init__(self):
         self._storage: dict[uuid.UUID, ModelType] = {}
 
-class UserRepository(InMemoryRepository[User]):
-    pass
+# Domain-specific methods:
+# find_all_by_*(context_id, filters, pagination) → (list, total)  ← for API (paginated)
+# find_*_by_*(context_id) → list | model                          ← for business logic (unpaginated)
 ```
 
 ## Current Implementation Status
@@ -234,11 +238,14 @@ auction-platform/
 │   │   │   ├── bid_service.py
 │   │   │   └── payment_service.py
 │   │   ├── repositories/
-│   │   │   ├── user_repository.py
-│   │   │   ├── auction_repository.py
-│   │   │   ├── lot_repository.py
-│   │   │   ├── bid_repository.py
-│   │   │   └── payment_repository.py
+│   │   │   ├── base.py                  ← AbstractRepository
+│   │   │   └── in_memory/
+│   │   │       ├── base.py              ← InMemoryRepository
+│   │   │       ├── user.py
+│   │   │       ├── auction.py
+│   │   │       ├── lot.py
+│   │   │       ├── bid.py
+│   │   │       └── payment.py
 │   │   ├── models/
 │   │   │   ├── user.py
 │   │   │   ├── auction.py

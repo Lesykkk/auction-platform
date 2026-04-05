@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 async def seed_data():
-    existing_user = await user_repository.get_by_username("testbuyer")
+    existing_user = await user_repository.find_by_username("testbuyer")
     if existing_user:
         logger.info("Seed data already exists")
         return

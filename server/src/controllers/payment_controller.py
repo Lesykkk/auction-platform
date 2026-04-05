@@ -1,14 +1,21 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from api.dependencies import CurrentUser, PaymentServiceDep
+from api.dependencies import CurrentUser, PaymentServiceDep, PaginationParamsDep, PaymentFilterParamsDep
 from schemas.payment import PaymentResponse
+from schemas.base import PaginatedResponse, Meta
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[PaymentResponse])
+@router.get("", response_model=PaginatedResponse[PaymentResponse])
 async def get_payments(
     user: CurrentUser,
     payment_service: PaymentServiceDep,
+    pagination: PaginationParamsDep,
+    filters: PaymentFilterParamsDep,
 ):
-    return await payment_service.get_user_payments(user)
+    items, total = await payment_service.get_user_payments(user, filters, pagination)
+    return PaginatedResponse(
+        items=items,
+        meta=Meta(total=total, page=pagination.page, limit=pagination.limit),
+    )
