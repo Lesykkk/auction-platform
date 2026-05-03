@@ -64,19 +64,18 @@ class BidService:
         if data.amount < current_price + min_increment:
             raise BusinessLogicError("Bid amount too low")
 
-        # Check existing bid by this user to calculate if they can afford this new bid
-        previous_bid = await self.bid_repository.get_user_highest_bid(data.lot_id, user_id)
-        previous_bid_amount = previous_bid.amount if previous_bid else Decimal("0.0")
+        # 3. Determine how much is currently locked for this lot.
+        # Only the current leader's amount is still reserved; older bids may
+        # exist in history even after their lock has been released.
+        previous_highest = await self.bid_repository.get_highest_bid(data.lot_id)
+        currently_locked_for_this_lot = Decimal("0.0")
+        if previous_highest and previous_highest.user_id == user_id:
+            currently_locked_for_this_lot = previous_highest.amount
 
-        # How much MORE they need to lock
-        required_additional_funds = data.amount - previous_bid_amount
+        required_additional_funds = data.amount - currently_locked_for_this_lot
 
         if available_balance < required_additional_funds:
             raise BusinessLogicError("Insufficient available funds")
-
-        # 3. Handle previous leader refund (if any) BEFORE saving new bid
-        # The logic is: get the current highest bid before we save our new one.
-        previous_highest = await self.bid_repository.get_highest_bid(data.lot_id)
 
         # 4. Create and Save Bid
         bid = Bid(

@@ -94,8 +94,29 @@ async def run_test_logic():
         charlie_info = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['charlie']}"})).json()
         print(f"Charlie Locked Balance: {charlie_info['locked_balance']} (Expected: 200.00)")
 
-        # 7. Settlement
-        print("7. Closing Auction & Final Settlement...")
+        # 7. TEST 3: Bob re-bids $250 after refund
+        print("7. TEST 3: Bob re-bids $250...")
+        rebid_resp = await client.post(
+            f"{BIDDING_API}/bids",
+            headers={"Authorization": f"Bearer {tokens['bob']}"},
+            json={"lot_id": lot_id, "amount": "250.00"},
+        )
+        assert rebid_resp.status_code in {200, 201}, rebid_resp.text
+
+        lot_info = (await client.get(f"{AUCTION_API}/lots/{lot_id}")).json()
+        print(f"Lot Current Price: {lot_info['current_price']} (Expected: 250.00)")
+        assert lot_info["current_price"] == "250.00"
+
+        charlie_info = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['charlie']}"})).json()
+        print(f"Charlie Locked Balance: {charlie_info['locked_balance']} (Expected: 0.00)")
+        assert charlie_info["locked_balance"] == "0.00"
+
+        bob_info = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['bob']}"})).json()
+        print(f"Bob Locked Balance: {bob_info['locked_balance']} (Expected: 250.00)")
+        assert bob_info["locked_balance"] == "250.00"
+
+        # 8. Settlement
+        print("8. Closing Auction & Final Settlement...")
         await client.post(f"{AUCTION_API}/auctions/{auction_id}/close", 
                          headers={"Authorization": f"Bearer {tokens['alice']}"})
         
@@ -105,12 +126,19 @@ async def run_test_logic():
         print(f"Lot Status: {lot_info['status']} (Expected: SOLD)")
         
         alice_final = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['alice']}"})).json()
-        print(f"Alice (Seller) Final Balance: {alice_final['balance']} (Expected: 1200.00)")
+        print(f"Alice (Seller) Final Balance: {alice_final['balance']} (Expected: 1250.00)")
+        assert alice_final["balance"] == "1250.00"
         
+        bob_final = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['bob']}"})).json()
+        print(f"Bob (Winner) Final Balance: {bob_final['balance']} (Expected: 750.00)")
+        print(f"Bob Final Locked: {bob_final['locked_balance']} (Expected: 0.00)")
+        assert bob_final["balance"] == "750.00"
+        assert bob_final["locked_balance"] == "0.00"
+
         charlie_final = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['charlie']}"})).json()
-        print(f"Charlie (Winner) Final Balance: {charlie_final['balance']} (Expected: 800.00)")
+        print(f"Charlie Final Balance: {charlie_final['balance']} (Expected: 1000.00)")
         print(f"Charlie Final Locked: {charlie_final['locked_balance']} (Expected: 0.00)")
-        assert charlie_final["balance"] == "800.00"
+        assert charlie_final["balance"] == "1000.00"
         assert charlie_final["locked_balance"] == "0.00"
 
         retry_resp = await client.post(
@@ -120,9 +148,9 @@ async def run_test_logic():
         assert retry_resp.status_code == 200, retry_resp.text
 
         alice_after_retry = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['alice']}"})).json()
-        charlie_after_retry = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['charlie']}"})).json()
-        assert alice_after_retry["balance"] == "1200.00"
-        assert charlie_after_retry["balance"] == "800.00"
+        bob_after_retry = (await client.get(f"{USER_API}/users/me", headers={"Authorization": f"Bearer {tokens['bob']}"})).json()
+        assert alice_after_retry["balance"] == "1250.00"
+        assert bob_after_retry["balance"] == "750.00"
 
         print("\nALL LOGIC TESTS PASSED!")
 
