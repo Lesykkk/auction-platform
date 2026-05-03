@@ -13,6 +13,11 @@ class PaymentRepository(SQLAlchemyRepository[Payment, PaymentFilterParams]):
     def __init__(self, db: AsyncSession):
         super().__init__(db, Payment)
 
+    async def find_by_lot_id(self, lot_id: uuid.UUID) -> Payment | None:
+        query = select(self.model).where(self.model.lot_id == lot_id)
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def find_all_by_user_id(
         self,
         user_id: uuid.UUID,

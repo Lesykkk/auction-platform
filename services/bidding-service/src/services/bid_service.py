@@ -74,7 +74,11 @@ class BidService:
         if available_balance < required_additional_funds:
             raise BusinessLogicError("Insufficient available funds")
 
-        # 3. Create Bid
+        # 3. Handle previous leader refund (if any) BEFORE saving new bid
+        # The logic is: get the current highest bid before we save our new one.
+        previous_highest = await self.bid_repository.get_highest_bid(data.lot_id)
+
+        # 4. Create and Save Bid
         bid = Bid(
             lot_id=data.lot_id,
             user_id=user_id,
@@ -82,12 +86,52 @@ class BidService:
         )
         saved_bid = await self.bid_repository.save(bid)
 
-        # 4. Adjust locked balance in User Service
-        # We increase their locked balance by the additional amount they are bidding
-        await self.user_client.adjust_balance(
-            user_id=user_id,
-            delta_balance=Decimal("0.0"),
-            delta_locked=required_additional_funds
-        )
+        current_bid_locked = False
+        previous_leader_unlocked = False
 
-        return saved_bid
+        try:
+            # 5. Financial adjustments
+            # A) Lock funds for CURRENT bidder
+            await self.user_client.adjust_balance(
+                user_id=user_id,
+                delta_balance=Decimal("0.0"),
+                delta_locked=required_additional_funds
+            )
+            current_bid_locked = True
+
+            # B) Unlock funds for PREVIOUS leader (if different user)
+            if previous_highest and previous_highest.user_id != user_id:
+                await self.user_client.adjust_balance(
+                    user_id=previous_highest.user_id,
+                    delta_balance=Decimal("0.0"),
+                    delta_locked=-previous_highest.amount
+                )
+                previous_leader_unlocked = True
+
+            # 6. Update current price in Auction Service
+            await self.auction_client.update_lot_price(data.lot_id, data.amount)
+            return saved_bid
+        except Exception:
+            # Best-effort compensation if a later cross-service call fails.
+            if previous_leader_unlocked and previous_highest:
+                try:
+                    await self.user_client.adjust_balance(
+                        user_id=previous_highest.user_id,
+                        delta_balance=Decimal("0.0"),
+                        delta_locked=previous_highest.amount,
+                    )
+                except Exception:
+                    pass
+
+            if current_bid_locked:
+                try:
+                    await self.user_client.adjust_balance(
+                        user_id=user_id,
+                        delta_balance=Decimal("0.0"),
+                        delta_locked=-required_additional_funds,
+                    )
+                except Exception:
+                    pass
+
+            await self.bid_repository.delete(saved_bid.id)
+            raise

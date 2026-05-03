@@ -1,5 +1,6 @@
 import httpx
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from core.config import get_settings
@@ -37,3 +38,15 @@ class AuctionServiceClient:
             except httpx.RequestError as e:
                 raise ServiceUnavailableError(detail=f"Auction service unavailable: {e}")
             return None
+
+    async def update_lot_price(self, lot_id: uuid.UUID, amount: Decimal) -> None:
+        """Internal: tell auction-service that the lot has a new current_price."""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.patch(
+                    f"{self.base_url}/api/v1/internal/lots/{lot_id}/current-price",
+                    json={"current_price": str(amount)}
+                )
+                response.raise_for_status()
+            except httpx.RequestError as e:
+                raise ServiceUnavailableError(detail=f"Auction service unavailable: {e}")

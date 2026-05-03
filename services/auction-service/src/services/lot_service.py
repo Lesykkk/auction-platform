@@ -87,3 +87,12 @@ class LotService:
             raise BusinessLogicError("Only PENDING lots can be deleted")
 
         await self.lot_repository.delete(lot_id)
+
+    async def update_current_price(self, lot_id: uuid.UUID, new_price: Decimal) -> Lot:
+        """Internal: update lot price after a new bid."""
+        lot = await self.get_by_id(lot_id)
+        if lot.status != LotStatus.ACTIVE:
+            raise BusinessLogicError("Only ACTIVE lots can have price updates")
+        
+        lot.current_price = new_price
+        return await self.lot_repository.save(lot)

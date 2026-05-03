@@ -40,3 +40,7 @@ class LotResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LotPriceUpdateRequest(BaseModel):
+    current_price: Decimal = Field(gt=0, le=Decimal("999999999999999.99"))

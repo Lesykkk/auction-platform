@@ -7,8 +7,9 @@ from fastapi import APIRouter
 from api.dependencies import DbDep
 from repositories.lot import LotRepository
 from repositories.auction import AuctionRepository
-from schemas.lot import LotResponse
+from schemas.lot import LotResponse, LotPriceUpdateRequest
 from schemas.auction import AuctionResponse
+from services.lot_service import LotService
 
 router = APIRouter()
 
@@ -21,6 +22,16 @@ async def get_lot_internal(lot_id: uuid.UUID, db: DbDep):
     if not lot:
          raise NotFoundError("Lot not found")
     return lot
+
+@router.patch("/lots/{lot_id}/current-price", response_model=LotResponse)
+async def update_lot_price_internal(
+    lot_id: uuid.UUID, 
+    data: LotPriceUpdateRequest, 
+    db: DbDep
+):
+    """Used by bidding-service to update lot price after a new valid bid."""
+    service = LotService(LotRepository(db), AuctionRepository(db))
+    return await service.update_current_price(lot_id, data.current_price)
 
 @router.get("/auctions/{auction_id}", response_model=AuctionResponse)
 async def get_auction_internal(auction_id: uuid.UUID, db: DbDep):

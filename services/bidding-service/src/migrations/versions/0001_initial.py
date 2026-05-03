@@ -37,6 +37,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('COMPLETED', 'REFUNDED', name='paymentstatus'), nullable=False),
     sa.Column('id', sa.Uuid(), server_default=sa.text('uuidv7()'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.UniqueConstraint('lot_id', name='uq_payments_lot_id'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_payments_lot_id'), 'payments', ['lot_id'], unique=False)

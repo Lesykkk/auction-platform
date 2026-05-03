@@ -8,3 +8,4 @@ psycopg[binary]==3.3.3
 alembic==1.18.4
 pwdlib[argon2]==0.3.0
 pyjwt==2.11.0
+httpx==0.28.1

@@ -55,6 +55,17 @@ class UserService:
     async def adjust_balance(self, user_id: uuid.UUID, data: AdjustBalanceRequest) -> User:
         """Internal: called by bidding-service to modify balance/locked_balance."""
         user = await self.get_by_id(user_id)
-        user.balance += data.delta_balance
-        user.locked_balance += data.delta_locked
+        
+        new_balance = user.balance + data.delta_balance
+        new_locked = user.locked_balance + data.delta_locked
+
+        if new_balance < Decimal("0.0"):
+            raise BusinessLogicError("Insufficient balance")
+        if new_locked < Decimal("0.0"):
+            raise BusinessLogicError("Locked balance cannot be negative")
+        if new_balance < new_locked:
+            raise BusinessLogicError("Available balance cannot be negative")
+
+        user.balance = new_balance
+        user.locked_balance = new_locked
         return await self.user_repository.save(user)

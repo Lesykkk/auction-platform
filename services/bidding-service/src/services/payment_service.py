@@ -2,6 +2,8 @@ import uuid
 from decimal import Decimal
 from typing import Sequence
 
+from sqlalchemy.exc import IntegrityError
+
 from clients.user_client import UserServiceClient
 from models.payment import Payment, PaymentStatus
 from repositories.bid import BidRepository
@@ -29,9 +31,13 @@ class PaymentService:
     async def settle_lot(self, lot_id: uuid.UUID, seller_id: uuid.UUID) -> None:
         """
         Called by auction-service when a lot is closed.
-        Retrieves all highest bids per user for this lot, processes winner
-        and refunds others. Updates balances via user-service.
+        Retrieves the winning bid, processes winner's payment and balance.
+        Losers are refunded real-time during bidding, so no additional refund logic needed here.
         """
+        existing_payment = await self.payment_repository.find_by_lot_id(lot_id)
+        if existing_payment:
+            return
+
         winning_bid = await self.bid_repository.get_highest_bid(lot_id)
         if not winning_bid:
             return  # No bids placed
@@ -39,65 +45,59 @@ class PaymentService:
         winner_id = winning_bid.user_id
         winning_amount = winning_bid.amount
 
-        # Find ALL bids for this lot to figure out who else needs a refund
-        # We process each user only once (their highest bid on this lot)
-        lots_bids, _ = await self.bid_repository.find_all_by_lot_id(
-            lot_id, BaseFilterParams(), PaginationParams(page=1, limit=10000)
+        # 1. Process Winner Payment
+        payment = Payment(
+            lot_id=lot_id,
+            user_id=winner_id,
+            amount=winning_amount,
+            status=PaymentStatus.COMPLETED,
         )
+        try:
+            await self.payment_repository.save(payment)
+        except IntegrityError:
+            await self.payment_repository.db.rollback()
+            return
 
-        processed_users = set()
+        winner_adjusted = False
+        seller_adjusted = False
 
-        for bid in lots_bids:
-            uid = bid.user_id
-            if uid in processed_users:
-                continue
-            
-            # get their highest
-            # (Note: if find_all_by_lot_id orders by amount desc, the first we see is their max.
-            # But let's just make a specific query to be safe)
-            user_max_bid = await self.bid_repository.get_user_highest_bid(lot_id, uid)
-            if not user_max_bid:
-                continue
+        try:
+            # 2. Financial adjustments via User Service
+            # A) Deduct winner's funds (already locked)
+            await self.user_client.adjust_balance(
+                user_id=winner_id,
+                delta_balance=-winning_amount,
+                delta_locked=-winning_amount
+            )
+            winner_adjusted = True
 
-            processed_users.add(uid)
-            locked_amount = user_max_bid.amount
+            # B) Transfer funds to seller
+            await self.user_client.adjust_balance(
+                user_id=seller_id,
+                delta_balance=winning_amount,
+                delta_locked=Decimal("0.0")
+            )
+            seller_adjusted = True
+        except Exception:
+            if seller_adjusted:
+                try:
+                    await self.user_client.adjust_balance(
+                        user_id=seller_id,
+                        delta_balance=-winning_amount,
+                        delta_locked=Decimal("0.0"),
+                    )
+                except Exception:
+                    pass
 
-            if uid == winner_id:
-                # 1. Winner logic
-                payment = Payment(
-                    lot_id=lot_id,
-                    user_id=winner_id,
-                    amount=winning_amount,
-                    status=PaymentStatus.COMPLETED,
-                )
-                await self.payment_repository.save(payment)
+            if winner_adjusted:
+                try:
+                    await self.user_client.adjust_balance(
+                        user_id=winner_id,
+                        delta_balance=winning_amount,
+                        delta_locked=winning_amount,
+                    )
+                except Exception:
+                    pass
 
-                # Deduct from balance AND locked_balance for the winner
-                await self.user_client.adjust_balance(
-                    user_id=winner_id,
-                    delta_balance=-winning_amount,
-                    delta_locked=-locked_amount
-                )
-
-                # Transfer funds to seller (they get the balance, but it's not locked)
-                await self.user_client.adjust_balance(
-                    user_id=seller_id,
-                    delta_balance=winning_amount,
-                    delta_locked=Decimal("0.0")
-                )
-            else:
-                # 2. Loser refund logic
-                payment = Payment(
-                    lot_id=lot_id,
-                    user_id=uid,
-                    amount=locked_amount,
-                    status=PaymentStatus.REFUNDED,
-                )
-                await self.payment_repository.save(payment)
-
-                # Unblock their funds
-                await self.user_client.adjust_balance(
-                    user_id=uid,
-                    delta_balance=Decimal("0.0"),
-                    delta_locked=-locked_amount
-                )
+            await self.payment_repository.delete(payment.id)
+            raise
