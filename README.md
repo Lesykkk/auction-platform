@@ -1,6 +1,6 @@
 # auction-platform
 
-Online auction platform — from a monolithic REST API to a microservices system in Kubernetes.
+Online auction platform — a microservices system with REST APIs, separate databases, and an nginx API gateway.
 
 ## Tech Stack
 
@@ -21,7 +21,7 @@ Online auction platform — from a monolithic REST API to a microservices system
 - Async throughout — FastAPI, SQLAlchemy, Psycopg 3
 - Dependency injection via FastAPI `Depends` and Annotated
 - Auth: JWT access token in response body (stored in client memory) + refresh token in `httpOnly` cookie
-- **Currently Stage 2:** PostgreSQL storage via SQLAlchemy 2.0.
+- Microservices split across `user-service`, `auction-service`, and `bidding-service`.
 - Repository pattern: `SQLAlchemyRepository` (in `repositories/base.py`) → specific repositories
 - Repositories have two method types: paginated (`find_all`) for API, unpaginated domain-specific methods for internal business logic
 - All business logic lives in services only — controllers are thin, repositories are dumb
@@ -214,46 +214,29 @@ class SQLAlchemyRepository(Generic[ModelType, FilterType]):
 
 ## Current Implementation Status
 
-- ✅ REST API (FastAPI)
-- ✅ PostgreSQL 18 integration
-- ✅ SQLAlchemy 2.0 (Async)
-- ✅ Alembic Migrations
-- ✅ Business Logic (Auctions, Lots, Bids, Payments)
-- ✅ Authentication (JWT + Refresh Tokens)
+- ✅ FastAPI-based REST APIs for all services
+- ✅ PostgreSQL 18 integration with separate databases per service
+- ✅ SQLAlchemy 2.0 async stack
+- ✅ Alembic migrations in each service
+- ✅ Microservices communication over HTTP
+- ✅ Business logic for auctions, lots, bids, payments, and settlement
+- ✅ Authentication (JWT + refresh tokens)
+- ✅ nginx API gateway on port `8000`
+- ✅ Integration tests for main auction flows
 
 ## Project Structure
 
 ```
 auction-platform/
-├── server/
-│   ├── src/
-│   │   ├── main.py
-│   │   ├── core/
-│   │   │   ├── config.py
-│   │   │   ├── database.py              ← DB Engine/Session
-│   │   │   ├── security.py
-│   │   │   └── seed.py                  ← DB Seeding
-│   │   ├── api/
-│   │   │   ├── router.py
-│   │   │   └── dependencies.py
-│   │   ├── controllers/                 ← HTTP Handlers
-│   │   ├── services/                    ← Business Logic
-│   │   ├── repositories/
-│   │   │   ├── base.py                  ← SQLAlchemyRepository
-│   │   │   ├── user.py
-│   │   │   ├── auction.py
-│   │   │   ├── lot.py
-│   │   │   ├── bid.py
-│   │   │   └── payment.py
-│   │   ├── models/                      ← SQLAlchemy Models
-│   │   ├── schemas/                     ← Pydantic DTOs
-│   │   ├── exceptions/
-│   │   │   └── handlers.py
-│   │   └── migrations/                  ← Alembic Migrations
-│   ├── alembic.ini
-│   └── requirements.txt
-├── .env
 ├── compose.yaml
+├── services/
+│   ├── user-service/
+│   ├── auction-service/
+│   ├── bidding-service/
+│   └── nginx/
+├── test_internal.py
+├── test_logic_alignment.py
+├── test_microservices.sh
 └── README.md
 ```
 
@@ -261,11 +244,11 @@ auction-platform/
 
 | Stage | Status | Architecture | Storage | What's added |
 |-------|--------|-------------|---------|--------------|
-| 1 | ✅ Done | Monolith | In-memory | REST API, CRUD, business logic, auth |
-| 2 | ✅ Done | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
-| 3 | ⏳ Planned | Microservices | PostgreSQL (separate DBs) | REST inter-service communication |
-| 4 | ⏳ Planned | Microservices | PostgreSQL + Redis | Docker, docker-compose, caching |
-| 5 | ⏳ Planned | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
+| 2 | ✅ Done | Monolith | In-memory | REST API, CRUD, business logic, auth |
+| 3 | ✅ Done | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
+| 4 | ✅ Done | Microservices | PostgreSQL (separate DBs) | REST inter-service communication, service split, nginx gateway, Docker Compose |
+| 5 | ⏳ Planned | Microservices | PostgreSQL + Redis | Redis caching, resilience improvements |
+| 6 | ⏳ Planned | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
 
 ## Running the Project
 
