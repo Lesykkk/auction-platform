@@ -20,6 +20,11 @@ def get_user_service_internal(db: DbDep) -> UserService:
 UserServiceInternalDep = UserService
 
 
+@router.get("/health")
+async def healthcheck():
+    return {"status": "ok", "service": "user-service"}
+
+
 @router.get("/users/{user_id}", response_model=UserResponse)
 async def get_user_internal(
     user_id: uuid.UUID,

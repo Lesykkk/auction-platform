@@ -1,0 +1,318 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-users-pvc
+  namespace: auction-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-auctions-pvc
+  namespace: auction-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-bidding-pvc
+  namespace: auction-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: auction-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-users
+  namespace: auction-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-users
+  template:
+    metadata:
+      labels:
+        app: db-users
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-trixie
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: auction_users
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_users
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_users
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: postgres-users-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-users-data
+          persistentVolumeClaim:
+            claimName: postgres-users-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-users
+  namespace: auction-platform
+spec:
+  selector:
+    app: db-users
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-auctions
+  namespace: auction-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-auctions
+  template:
+    metadata:
+      labels:
+        app: db-auctions
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-trixie
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: auction_auctions
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_auctions
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_auctions
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: postgres-auctions-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-auctions-data
+          persistentVolumeClaim:
+            claimName: postgres-auctions-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-auctions
+  namespace: auction-platform
+spec:
+  selector:
+    app: db-auctions
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-bidding
+  namespace: auction-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-bidding
+  template:
+    metadata:
+      labels:
+        app: db-bidding
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-trixie
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: auction_bidding
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_bidding
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d auction_bidding
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: postgres-bidding-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-bidding-data
+          persistentVolumeClaim:
+            claimName: postgres-bidding-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-bidding
+  namespace: auction-platform
+spec:
+  selector:
+    app: db-bidding
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: auction-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: auction-platform
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

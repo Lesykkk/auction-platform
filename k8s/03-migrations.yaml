@@ -1,0 +1,168 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: user-service-migrations
+  namespace: auction-platform
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: user-service-migrations
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrations
+          image: auction-platform/user-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - alembic upgrade head
+          workingDir: /service/src
+          env:
+            - name: POSTGRES_HOST
+              value: db-users
+            - name: POSTGRES_DB
+              value: auction_users
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: SECRET_KEY
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: auction-service-migrations
+  namespace: auction-platform
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: auction-service-migrations
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrations
+          image: auction-platform/auction-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - alembic upgrade head
+          workingDir: /service/src
+          env:
+            - name: POSTGRES_HOST
+              value: db-auctions
+            - name: POSTGRES_DB
+              value: auction_auctions
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: SECRET_KEY
+            - name: USER_SERVICE_URL
+              value: http://user-service:8001
+            - name: BIDDING_SERVICE_URL
+              value: http://bidding-service:8003
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: REDIS_DB
+            - name: AUCTION_CACHE_TTL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: AUCTION_CACHE_TTL_SECONDS
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bidding-service-migrations
+  namespace: auction-platform
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: bidding-service-migrations
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrations
+          image: auction-platform/bidding-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - alembic upgrade head
+          workingDir: /service/src
+          env:
+            - name: POSTGRES_HOST
+              value: db-bidding
+            - name: POSTGRES_DB
+              value: auction_bidding
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: auction-platform-config
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: auction-platform-secrets
+                  key: SECRET_KEY
+            - name: USER_SERVICE_URL
+              value: http://user-service:8001
+            - name: AUCTION_SERVICE_URL
+              value: http://auction-service:8002

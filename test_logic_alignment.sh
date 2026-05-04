@@ -2,9 +2,10 @@
 set -euo pipefail
 
 # Service URLs
-USER_API="http://127.0.0.1:8001/api/v1"
-AUCTION_API="http://127.0.0.1:8002/api/v1"
-BIDDING_API="http://127.0.0.1:8003/api/v1"
+GATEWAY="http://127.0.0.1:63221/api/v1"
+USER_API="$GATEWAY"
+AUCTION_API="$GATEWAY"
+BIDDING_API="$GATEWAY"
 SUFFIX="$(date +%s)_$$"
 ALICE_USERNAME="alice_${SUFFIX}"
 ALICE_EMAIL="alice_${SUFFIX}@example.com"

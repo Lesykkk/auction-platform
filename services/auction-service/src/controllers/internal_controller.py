@@ -15,6 +15,11 @@ from services.lot_service import LotService
 router = APIRouter()
 
 
+@router.get("/health")
+async def healthcheck():
+    return {"status": "ok", "service": "auction-service"}
+
+
 @router.post("/batch/lots", response_model=list[LotResponse])
 async def get_lots_internal_batch(data: UUIDListRequest, db: DbDep):
     repo = LotRepository(db)

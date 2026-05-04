@@ -12,6 +12,11 @@ from schemas.payment import SettleLotRequest
 router = APIRouter()
 
 
+@router.get("/health")
+async def healthcheck():
+    return {"status": "ok", "service": "bidding-service"}
+
+
 @router.get("/bids/winning", response_model=BidResponse)
 async def get_winning_bid_internal(lot_id: uuid.UUID, db: DbDep):
     """Used by auction-service during lot close to fetch highest bid."""

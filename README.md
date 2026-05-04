@@ -256,7 +256,7 @@ auction-platform/
 | 3 | ✅ Done | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
 | 4 | ✅ Done | Microservices | PostgreSQL (separate DBs) | REST inter-service communication, service split, nginx gateway, Docker Compose |
 | 5 | ✅ Done | Microservices | PostgreSQL + Redis | Redis caching, Dockerized services, cache invalidation |
-| 6 | ⏳ Planned | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
+| 6 | ✅ Done | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
 
 ## Running the Project
 
@@ -299,3 +299,82 @@ Run the cache timing test locally with output:
 ```bash
 python3 -m pytest -s -q services/auction-service/src/test_cache_behavior.py
 ```
+
+## Kubernetes Deployment
+
+The repository includes Kubernetes manifests in [`k8s/`](/Users/roman/Documents/auction-platform/k8s).
+
+### Prerequisites
+
+- `minikube`
+- `kubectl`
+- Docker daemon available for building service images
+
+### Build Images For Minikube
+
+Use the Minikube Docker daemon so the cluster can see the local images without pushing them to a registry:
+
+```bash
+minikube start
+eval "$(minikube docker-env)"
+
+docker build -t auction-platform/user-service:latest ./services/user-service
+docker build -t auction-platform/auction-service:latest ./services/auction-service
+docker build -t auction-platform/bidding-service:latest ./services/bidding-service
+```
+
+### Apply Manifests
+
+Apply resources in order:
+
+```bash
+kubectl apply -f k8s/00-namespace.yaml
+kubectl apply -f k8s/01-config.yaml
+kubectl apply -f k8s/02-infra.yaml
+kubectl apply -f k8s/03-migrations.yaml
+kubectl wait --namespace auction-platform --for=condition=complete job/user-service-migrations --timeout=180s
+kubectl wait --namespace auction-platform --for=condition=complete job/auction-service-migrations --timeout=180s
+kubectl wait --namespace auction-platform --for=condition=complete job/bidding-service-migrations --timeout=180s
+kubectl apply -f k8s/04-apps.yaml
+```
+
+### Verify The Cluster
+
+```bash
+kubectl get all -n auction-platform
+kubectl get pods -n auction-platform -o wide
+minikube service nginx -n auction-platform --url
+```
+
+The gateway is exposed through `nginx` on NodePort `30080`.
+
+### Required Lab Checks
+
+Scale one service:
+
+```bash
+kubectl scale deployment auction-service --replicas=3 -n auction-platform
+kubectl get pods -l app=auction-service -n auction-platform
+```
+
+Delete a Pod and watch automatic recovery:
+
+```bash
+kubectl delete pod -l app=auction-service -n auction-platform --grace-period=0 --force
+kubectl get pods -l app=auction-service -n auction-platform -w
+```
+
+Run a rolling update:
+
+```bash
+kubectl set image deployment/auction-service \
+  auction-service=auction-platform/auction-service:latest \
+  -n auction-platform
+kubectl rollout status deployment/auction-service -n auction-platform
+```
+
+### Notes
+
+- The application Deployments override the Docker `CMD` and run `uvicorn` without `--reload`, which is more appropriate for Kubernetes.
+- Database migrations are executed through separate `Job` resources before the application Deployments are applied.
+- PostgreSQL and Redis are modeled as `Deployment` resources to match the lab requirement, though in production they are usually managed differently.
