@@ -5,12 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import async_session_maker
 from core.security import decode_token
+from core.config import get_settings
+from core.cache import get_redis_client
 from exceptions.handlers import UnauthorizedError
 
 from repositories.auction import AuctionRepository
 from repositories.lot import LotRepository
 from services.auction_service import AuctionService
 from services.lot_service import LotService
+from services.auction_cache import AuctionCache
 from schemas.base import PaginationParams
 from schemas.auction import AuctionFilterParams
 from schemas.lot import LotFilterParams
@@ -47,6 +50,10 @@ def get_bidding_client() -> BiddingServiceClient:
     return BiddingServiceClient()
 
 
+def get_auction_cache() -> AuctionCache:
+    return AuctionCache(get_redis_client(), get_settings().AUCTION_CACHE_TTL_SECONDS)
+
+
 def get_lot_service(
     lot_repo: LotRepository = Depends(get_lot_repository),
     auction_repo: AuctionRepository = Depends(get_auction_repository),
@@ -58,8 +65,9 @@ def get_auction_service(
     auction_repo: AuctionRepository = Depends(get_auction_repository),
     lot_repo: LotRepository = Depends(get_lot_repository),
     bidding_client: BiddingServiceClient = Depends(get_bidding_client),
+    auction_cache: AuctionCache = Depends(get_auction_cache),
 ) -> AuctionService:
-    return AuctionService(auction_repo, lot_repo, bidding_client)
+    return AuctionService(auction_repo, lot_repo, bidding_client, auction_cache)
 
 
 async def get_current_user_id(request: Request) -> uuid.UUID:

@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from api.dependencies import CurrentUserId, AuctionServiceDep, PaginationParamsDep, AuctionFilterParamsDep
 from schemas.auction import AuctionCreateRequest, AuctionUpdateRequest, AuctionResponse
@@ -25,8 +25,11 @@ async def get_auctions(
 async def get_auction(
     auction_id: uuid.UUID,
     auction_service: AuctionServiceDep,
+    response: Response,
 ):
-    return await auction_service.get_by_id(auction_id)
+    auction, cache_status = await auction_service.get_cached_by_id(auction_id)
+    response.headers["X-Cache"] = cache_status
+    return auction
 
 
 @router.post("", response_model=AuctionResponse)

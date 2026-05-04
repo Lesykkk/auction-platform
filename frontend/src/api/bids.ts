@@ -1,5 +1,5 @@
 import { api } from "./http";
-import type { Bid, PaginatedResponse, PaginationParams } from "../types";
+import type { Bid, MyBidsPaginatedResponse, PaginatedResponse, PaginationParams } from "../types";
 
 export const bidsApi = {
   async listByLot(lotId: string, params: PaginationParams = {}) {
@@ -10,6 +10,10 @@ export const bidsApi = {
   },
   async placeBid(lotId: string, amount: string) {
     const { data } = await api.post<Bid>("/bids", { lot_id: lotId, amount });
+    return data;
+  },
+  async listMine(params: PaginationParams = {}) {
+    const { data } = await api.get<MyBidsPaginatedResponse>("/bids/me", { params });
     return data;
   }
 };

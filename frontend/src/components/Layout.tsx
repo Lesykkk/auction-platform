@@ -17,6 +17,7 @@ export const Layout = () => {
           <a href="#how-it-works">Як це працює</a>
           <a href="#contacts">Контакти</a>
           {user && <NavLink to="/organizer">Керування</NavLink>}
+          {user && <NavLink to="/locked-funds">Блокування</NavLink>}
           {user && <NavLink to="/payments">Платежі</NavLink>}
         </nav>
         <div className="header-actions">

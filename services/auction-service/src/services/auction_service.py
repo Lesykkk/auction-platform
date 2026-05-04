@@ -6,9 +6,10 @@ from models.auction import Auction, AuctionStatus
 from models.lot import LotStatus
 from repositories.auction import AuctionRepository
 from repositories.lot import LotRepository
-from schemas.auction import AuctionCreateRequest, AuctionUpdateRequest, AuctionFilterParams
+from schemas.auction import AuctionCreateRequest, AuctionUpdateRequest, AuctionFilterParams, AuctionResponse
 from schemas.base import PaginationParams
 from clients.bidding_client import BiddingServiceClient
+from services.auction_cache import AuctionCache
 
 
 class AuctionService:
@@ -17,10 +18,12 @@ class AuctionService:
         auction_repository: AuctionRepository,
         lot_repository: LotRepository,
         bidding_client: BiddingServiceClient,
+        auction_cache: AuctionCache,
     ):
         self.auction_repository = auction_repository
         self.lot_repository = lot_repository
         self.bidding_client = bidding_client
+        self.auction_cache = auction_cache
 
     async def get_all(
         self,
@@ -34,6 +37,16 @@ class AuctionService:
         if not auction:
             raise NotFoundError("Auction not found")
         return auction
+
+    async def get_cached_by_id(self, auction_id: uuid.UUID) -> tuple[AuctionResponse, str]:
+        cached = await self.auction_cache.get(auction_id)
+        if cached:
+            return cached, "HIT"
+
+        auction = await self.get_by_id(auction_id)
+        response = AuctionResponse.model_validate(auction)
+        await self.auction_cache.set(response)
+        return response, "MISS"
 
     async def create(self, data: AuctionCreateRequest, user_id: uuid.UUID) -> Auction:
         auction = Auction(
@@ -60,7 +73,9 @@ class AuctionService:
         if data.closes_at is not None:
             auction.closes_at = data.closes_at
 
-        return await self.auction_repository.save(auction)
+        auction = await self.auction_repository.save(auction)
+        await self.auction_cache.invalidate(auction_id)
+        return auction
 
     async def delete(self, auction_id: uuid.UUID, user_id: uuid.UUID) -> None:
         auction = await self.get_by_id(auction_id)
@@ -74,6 +89,7 @@ class AuctionService:
             await self.lot_repository.delete(lot.id)
 
         await self.auction_repository.delete(auction_id)
+        await self.auction_cache.invalidate(auction_id)
 
     async def open(self, auction_id: uuid.UUID, user_id: uuid.UUID) -> Auction:
         auction = await self.get_by_id(auction_id)
@@ -84,6 +100,7 @@ class AuctionService:
 
         auction.status = AuctionStatus.ACTIVE
         await self.auction_repository.save(auction)
+        await self.auction_cache.invalidate(auction_id)
 
         lots = await self.lot_repository.find_lots_by_auction_id(auction_id)
         for lot in lots:
@@ -102,6 +119,7 @@ class AuctionService:
 
         auction.status = AuctionStatus.CLOSED
         await self.auction_repository.save(auction)
+        await self.auction_cache.invalidate(auction_id)
 
         lots = await self.lot_repository.find_lots_by_auction_id(auction_id)
         for lot in lots:

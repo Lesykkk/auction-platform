@@ -336,7 +336,8 @@ textarea:focus {
 .meta-grid,
 .lot-price-row,
 .price-panel,
-.balance-strip {
+.balance-strip,
+.summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
@@ -349,7 +350,8 @@ textarea:focus {
 .meta-grid div,
 .lot-price-row div,
 .price-panel div,
-.balance-strip div {
+.balance-strip div,
+.summary-card {
   padding: 0.8rem;
   border-radius: 0.65rem;
   background: var(--surface-muted);
@@ -358,11 +360,25 @@ textarea:focus {
 dt,
 .lot-price-row span,
 .price-panel span,
-.balance-strip span {
+.balance-strip span,
+.summary-card span {
   display: block;
   margin-bottom: 0.25rem;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.summary-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.summary-card small {
+  color: var(--muted);
+}
+
+.balance-strip.compact {
+  grid-template-columns: 1fr;
 }
 
 dd {
@@ -624,6 +640,46 @@ th {
   padding-left: 1.2rem;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.row-stack {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.status-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.table-link {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.lock-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.lock-indicator.locked {
+  background: #fff3e8;
+  color: #9a6129;
+}
+
+.lock-indicator.released {
+  background: #edf1ee;
+  color: #5c665f;
+}
+
+.highlight-row td {
+  background: rgba(194, 155, 117, 0.08);
 }
 
 .info-band {

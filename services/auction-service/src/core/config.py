@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     USER_SERVICE_URL: str = "http://user-service:8001"
     BIDDING_SERVICE_URL: str = "http://bidding-service:8003"
 
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    AUCTION_CACHE_TTL_SECONDS: int = 60
+
     @property
     def DATABASE_URL(self) -> str:
         return (

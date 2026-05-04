@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuctionDetailPage } from "./pages/AuctionDetailPage";
 import { AuctionsPage } from "./pages/AuctionsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { LockedFundsPage } from "./pages/LockedFundsPage";
 import { LotDetailPage } from "./pages/LotDetailPage";
 import { OrganizerPage } from "./pages/OrganizerPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
@@ -21,6 +22,7 @@ export const App = () => (
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/locked-funds" element={<LockedFundsPage />} />
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/organizer" element={<OrganizerPage />} />
       </Route>

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { formatMoney } from "../utils";
@@ -91,6 +92,21 @@ export const ProfilePage = () => {
           </label>
           <button className="primary-button">Поповнити</button>
         </form>
+        <div className="management-panel stack-form">
+          <h2>Заблоковані кошти</h2>
+          <p>
+            Перегляньте, які саме ставки зараз утримують кошти, і на яких лотах вони заблоковані.
+          </p>
+          <div className="balance-strip compact">
+            <div>
+              <span>Зараз заблоковано</span>
+              <strong>{formatMoney(user.locked_balance)}</strong>
+            </div>
+          </div>
+          <Link className="primary-button" to="/locked-funds">
+            Переглянути блокування
+          </Link>
+        </div>
       </div>
     </section>
   );

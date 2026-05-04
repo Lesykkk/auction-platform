@@ -1,11 +1,23 @@
 import httpx
 import asyncio
+import os
 import uuid
 from decimal import Decimal
 
-USER_API = "http://127.0.0.1:8001/api/v1"
-AUCTION_API = "http://127.0.0.1:8002/api/v1"
-BIDDING_API = "http://127.0.0.1:8003/api/v1"
+IN_DOCKER = os.path.exists("/.dockerenv")
+
+USER_API = os.getenv(
+    "USER_API",
+    "http://user-service:8001/api/v1" if IN_DOCKER else "http://127.0.0.1:8001/api/v1",
+)
+AUCTION_API = os.getenv(
+    "AUCTION_API",
+    "http://auction-service:8002/api/v1" if IN_DOCKER else "http://127.0.0.1:8002/api/v1",
+)
+BIDDING_API = os.getenv(
+    "BIDDING_API",
+    "http://bidding-service:8003/api/v1" if IN_DOCKER else "http://127.0.0.1:8003/api/v1",
+)
 
 async def run_test_logic():
     async with httpx.AsyncClient(timeout=10.0) as client:

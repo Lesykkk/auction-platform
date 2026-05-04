@@ -54,6 +54,32 @@ export type Bid = {
   created_at: string;
 };
 
+export type MyBid = {
+  id: string;
+  lot_id: string;
+  auction_id: string;
+  user_id: string;
+  amount: string;
+  current_price: string;
+  lot_title: string;
+  lot_status: LotStatus;
+  auction_title: string;
+  auction_status: AuctionStatus;
+  is_locked: boolean;
+  locked_amount: string;
+  created_at: string;
+};
+
+export type MyBidsSummary = {
+  total_locked_amount: string;
+};
+
+export type MyBidsPaginatedResponse = {
+  items: MyBid[];
+  meta: Meta;
+  summary: MyBidsSummary;
+};
+
 export type Payment = {
   id: string;
   lot_id: string;
