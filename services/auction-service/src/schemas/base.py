@@ -1,5 +1,6 @@
 import math
 from typing import Generic, TypeVar, Sequence
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -35,3 +36,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 class BaseFilterParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class UUIDListRequest(BaseModel):
+    ids: list[UUID]

@@ -50,3 +50,31 @@ class AuctionServiceClient:
                 response.raise_for_status()
             except httpx.RequestError as e:
                 raise ServiceUnavailableError(detail=f"Auction service unavailable: {e}")
+
+    async def get_lots_batch(self, lot_ids: list[uuid.UUID]) -> list[dict[str, Any]]:
+        if not lot_ids:
+            return []
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/v1/internal/batch/lots",
+                    json={"ids": [str(lot_id) for lot_id in lot_ids]},
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.RequestError as e:
+                raise ServiceUnavailableError(detail=f"Auction service unavailable: {e}")
+
+    async def get_auctions_batch(self, auction_ids: list[uuid.UUID]) -> list[dict[str, Any]]:
+        if not auction_ids:
+            return []
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/v1/internal/batch/auctions",
+                    json={"ids": [str(auction_id) for auction_id in auction_ids]},
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.RequestError as e:
+                raise ServiceUnavailableError(detail=f"Auction service unavailable: {e}")

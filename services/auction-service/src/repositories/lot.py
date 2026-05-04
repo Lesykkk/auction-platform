@@ -27,3 +27,10 @@ class LotRepository(SQLAlchemyRepository[Lot, LotFilterParams]):
         query = select(self.model).where(self.model.auction_id == auction_id)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def find_by_ids(self, lot_ids: Sequence[uuid.UUID]) -> Sequence[Lot]:
+        if not lot_ids:
+            return []
+        query = select(self.model).where(self.model.id.in_(lot_ids))
+        result = await self.db.execute(query)
+        return result.scalars().all()

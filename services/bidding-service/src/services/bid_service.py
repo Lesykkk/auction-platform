@@ -8,7 +8,7 @@ from clients.auction_client import AuctionServiceClient
 from models.bid import Bid
 from repositories.bid import BidRepository
 from schemas.base import BaseFilterParams, PaginationParams
-from schemas.bid import BidCreateRequest
+from schemas.bid import BidCreateRequest, MyBidResponse, MyBidsSummary
 
 
 class BidService:
@@ -29,6 +29,65 @@ class BidService:
 
     async def get_highest_bid(self, lot_id: uuid.UUID) -> Bid | None:
         return await self.bid_repository.get_highest_bid(lot_id)
+
+    async def get_by_user_id(
+        self,
+        user_id: uuid.UUID,
+        filters: BaseFilterParams,
+        pagination: PaginationParams,
+    ) -> tuple[list[MyBidResponse], int, MyBidsSummary]:
+        bids, total = await self.bid_repository.find_all_by_user_id(user_id, filters, pagination)
+        all_user_lot_ids = await self.bid_repository.find_lot_ids_by_user_id(user_id)
+        global_highest_bids_by_lot = await self.bid_repository.get_highest_bids_for_lot_ids(all_user_lot_ids)
+        lot_ids = list({bid.lot_id for bid in bids})
+
+        highest_bids_by_lot = await self.bid_repository.get_highest_bids_for_lot_ids(lot_ids)
+        lots = await self.auction_client.get_lots_batch(lot_ids)
+        lots_by_id = {uuid.UUID(lot["id"]): lot for lot in lots}
+
+        auction_ids = list({uuid.UUID(lot["auction_id"]) for lot in lots if lot.get("auction_id")})
+        auctions = await self.auction_client.get_auctions_batch(auction_ids)
+        auctions_by_id = {uuid.UUID(auction["id"]): auction for auction in auctions}
+
+        items: list[MyBidResponse] = []
+        total_locked_amount = sum(
+            (bid.amount for bid in global_highest_bids_by_lot.values() if bid.user_id == user_id),
+            Decimal("0.0"),
+        )
+
+        for bid in bids:
+            lot = lots_by_id.get(bid.lot_id)
+            if not lot:
+                raise NotFoundError("Lot not found")
+
+            auction_id = uuid.UUID(lot["auction_id"])
+            auction = auctions_by_id.get(auction_id)
+            if not auction:
+                raise NotFoundError("Auction not found")
+
+            highest_bid = highest_bids_by_lot.get(bid.lot_id)
+            is_locked = bool(highest_bid and highest_bid.user_id == user_id and highest_bid.id == bid.id)
+            locked_amount = bid.amount if is_locked else Decimal("0.0")
+
+            items.append(
+                MyBidResponse(
+                    id=bid.id,
+                    lot_id=bid.lot_id,
+                    auction_id=auction_id,
+                    user_id=bid.user_id,
+                    amount=bid.amount,
+                    current_price=Decimal(lot["current_price"]),
+                    lot_title=lot["title"],
+                    lot_status=lot["status"],
+                    auction_title=auction["title"],
+                    auction_status=auction["status"],
+                    is_locked=is_locked,
+                    locked_amount=locked_amount,
+                    created_at=bid.created_at,
+                )
+            )
+
+        return items, total, MyBidsSummary(total_locked_amount=total_locked_amount)
 
     async def place_bid(self, data: BidCreateRequest, user_id: uuid.UUID) -> Bid:
         # 1. Fetch cross-service data

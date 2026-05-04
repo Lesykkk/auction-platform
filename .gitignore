@@ -10,3 +10,5 @@ staticfiles
 media
 *.onnx
 GEMINI.md
+*/node_modules/
+*/dist/

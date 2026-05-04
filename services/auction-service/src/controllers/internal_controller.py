@@ -9,9 +9,25 @@ from repositories.lot import LotRepository
 from repositories.auction import AuctionRepository
 from schemas.lot import LotResponse, LotPriceUpdateRequest
 from schemas.auction import AuctionResponse
+from schemas.base import UUIDListRequest
 from services.lot_service import LotService
 
 router = APIRouter()
+
+
+@router.post("/batch/lots", response_model=list[LotResponse])
+async def get_lots_internal_batch(data: UUIDListRequest, db: DbDep):
+    repo = LotRepository(db)
+    lots = await repo.find_by_ids(data.ids)
+    return list(lots)
+
+
+@router.post("/batch/auctions", response_model=list[AuctionResponse])
+async def get_auctions_internal_batch(data: UUIDListRequest, db: DbDep):
+    repo = AuctionRepository(db)
+    auctions = await repo.find_by_ids(data.ids)
+    return list(auctions)
+
 
 @router.get("/lots/{lot_id}", response_model=LotResponse)
 async def get_lot_internal(lot_id: uuid.UUID, db: DbDep):

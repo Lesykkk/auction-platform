@@ -17,3 +17,10 @@ class AuctionRepository(SQLAlchemyRepository[Auction, AuctionFilterParams]):
         query = select(self.model).where(self.model.user_id == user_id)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def find_by_ids(self, auction_ids: Sequence[uuid.UUID]) -> Sequence[Auction]:
+        if not auction_ids:
+            return []
+        query = select(self.model).where(self.model.id.in_(auction_ids))
+        result = await self.db.execute(query)
+        return result.scalars().all()

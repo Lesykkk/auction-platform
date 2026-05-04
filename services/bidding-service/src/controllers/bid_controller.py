@@ -1,8 +1,8 @@
 import uuid
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 
 from api.dependencies import CurrentUserId, BidServiceDep, PaginationParamsDep
-from schemas.bid import BidCreateRequest, BidResponse
+from schemas.bid import BidCreateRequest, BidResponse, MyBidsPaginatedResponse
 from schemas.base import BaseFilterParams, PaginatedResponse, Meta
 
 router = APIRouter()
@@ -28,3 +28,17 @@ async def place_bid(
     bid_service: BidServiceDep,
 ):
     return await bid_service.place_bid(data, user_id)
+
+
+@router.get("/me", response_model=MyBidsPaginatedResponse)
+async def get_my_bids(
+    user_id: CurrentUserId,
+    bid_service: BidServiceDep,
+    pagination: PaginationParamsDep,
+):
+    items, total, summary = await bid_service.get_by_user_id(user_id, BaseFilterParams(), pagination)
+    return MyBidsPaginatedResponse(
+        items=items,
+        meta=Meta(total=total, page=pagination.page, limit=pagination.limit),
+        summary=summary,
+    )
