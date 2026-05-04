@@ -1,6 +1,6 @@
 # auction-platform
 
-Online auction platform — a microservices system with REST APIs, separate databases, and an nginx API gateway.
+Online auction platform — a microservices system with REST APIs, separate PostgreSQL databases, a Redis cache for auction reads, and an nginx API gateway.
 
 ## Tech Stack
 
@@ -10,9 +10,11 @@ Online auction platform — a microservices system with REST APIs, separate data
 - **DB Driver:** Psycopg 3 (async)
 - **Validation:** Pydantic 2
 - **Database:** PostgreSQL 18 (native `uuidv7()`)
+- **Cache:** Redis 7
 - **Migrations:** Alembic
 - **Password hashing:** pwdlib (argon2)
 - **JWT:** PyJWT
+- **Testing:** pytest
 
 ## Architecture Decisions
 
@@ -21,10 +23,11 @@ Online auction platform — a microservices system with REST APIs, separate data
 - Async throughout — FastAPI, SQLAlchemy, Psycopg 3
 - Dependency injection via FastAPI `Depends` and Annotated
 - Auth: JWT access token in response body (stored in client memory) + refresh token in `httpOnly` cookie
-- Microservices split across `user-service`, `auction-service`, and `bidding-service`.
+- Microservices split across `user-service`, `auction-service`, and `bidding-service`, with Redis used by `auction-service` for cached public auction reads.
 - Repository pattern: `SQLAlchemyRepository` (in `repositories/base.py`) → specific repositories
 - Repositories have two method types: paginated (`find_all`) for API, unpaginated domain-specific methods for internal business logic
 - All business logic lives in services only — controllers are thin, repositories are dumb
+- Cache-aside pattern is used for `GET /auctions/{id}` with TTL-based eviction and explicit invalidation on writes.
 
 ## Layer Responsibilities
 
@@ -34,6 +37,7 @@ Online auction platform — a microservices system with REST APIs, separate data
 - **`schemas/`** — Pydantic request/response models (DTOs)
 - **`models/`** — SQLAlchemy declarative models
 - **`core/config.py`** — pydantic-settings, reads from environment variables
+- **`core/cache.py`** — Redis client and cache helpers for auction reads
 - **`core/security.py`** — JWT encode/decode, password hashing via pwdlib argon2
 - **`api/router.py`** — main router, collects all sub-routers with prefixes and tags
 - **`api/dependencies.py`** — FastAPI Annotated Depends - AuthServiceDep, CurrentUser, UserServiceDep..
@@ -151,10 +155,11 @@ User    (1) ──< Auction (N) one user creates many auctions
 ```
 available_balance = balance - locked_balance
 
-Place bid:    locked_balance += bid_amount
-Re-bid:       locked_balance -= user's previous bid on this lot, locked_balance += new_bid_amount
-Win:          balance -= bid_amount, locked_balance -= bid_amount
-Lose/Refund:  locked_balance -= bid_amount (highest bid of the user on this lot)
+First bid on lot:      locked_balance += bid_amount
+Re-bid by same leader: locked_balance -= previous_leader_amount
+                       locked_balance += new_bid_amount
+Outbid by another user: locked_balance -= previous highest bid on that lot
+Win at settlement:     balance -= winning_amount, locked_balance -= winning_amount
 ```
 
 ## API Endpoints
@@ -171,7 +176,7 @@ All endpoints are prefixed with `/api/v1`.
 | PATCH | `/users/me` | ✅ | Update current user |
 | POST | `/users/me/top-up` | ✅ | Top up balance |
 | GET | `/auctions` | ❌ | Get all auctions |
-| GET | `/auctions/{id}` | ❌ | Get auction by id |
+| GET | `/auctions/{id}` | ❌ | Get auction by id, returns `X-Cache: MISS/HIT` |
 | POST | `/auctions` | ✅ | Create auction (PENDING) |
 | PATCH | `/auctions/{id}` | ✅ | Update auction (owner only, PENDING only) |
 | DELETE | `/auctions/{id}` | ✅ | Delete auction (owner only, PENDING only, cascades to lots) |
@@ -222,7 +227,9 @@ class SQLAlchemyRepository(Generic[ModelType, FilterType]):
 - ✅ Business logic for auctions, lots, bids, payments, and settlement
 - ✅ Authentication (JWT + refresh tokens)
 - ✅ nginx API gateway on port `8000`
+- ✅ Redis cache for `GET /auctions/{id}`
 - ✅ Integration tests for main auction flows
+- ✅ Cache comparison test with timing output and `X-Cache` header checks
 
 ## Project Structure
 
@@ -237,6 +244,7 @@ auction-platform/
 ├── test_internal.py
 ├── test_logic_alignment.py
 ├── test_microservices.sh
+├── services/auction-service/src/test_cache_behavior.py
 └── README.md
 ```
 
@@ -247,7 +255,7 @@ auction-platform/
 | 2 | ✅ Done | Monolith | In-memory | REST API, CRUD, business logic, auth |
 | 3 | ✅ Done | Monolith | PostgreSQL 18 | SQLAlchemy 2, Alembic, transactions |
 | 4 | ✅ Done | Microservices | PostgreSQL (separate DBs) | REST inter-service communication, service split, nginx gateway, Docker Compose |
-| 5 | ⏳ Planned | Microservices | PostgreSQL + Redis | Redis caching, resilience improvements |
+| 5 | ✅ Done | Microservices | PostgreSQL + Redis | Redis caching, Dockerized services, cache invalidation |
 | 6 | ⏳ Planned | Microservices | PostgreSQL + Redis | Kubernetes, scaling, rolling update |
 
 ## Running the Project
@@ -263,7 +271,7 @@ auction-platform/
 cp .env.example .env
 
 # 2. Start all services
-docker compose up --build
+docker compose up -d --build
 ```
 
 ### Environment Variables
@@ -272,5 +280,22 @@ docker compose up --build
 |----------|---------|-------------|
 | `POSTGRES_USER` | — | PostgreSQL username |
 | `POSTGRES_PASSWORD` | — | PostgreSQL password |
-| `POSTGRES_DB` | `auction_platform` | PostgreSQL database name |
 | `SECRET_KEY` | — | JWT secret key |
+
+`POSTGRES_DB` is set per service in `compose.yaml`, so it does not need to be added to `.env`.
+
+### Testing
+
+Run the Docker-backed integration checks:
+
+```bash
+bash test_microservices.sh
+bash test_logic_alignment.sh
+docker compose exec -T auction-service python -m pytest -q test_cache_behavior.py
+```
+
+Run the cache timing test locally with output:
+
+```bash
+python3 -m pytest -s -q services/auction-service/src/test_cache_behavior.py
+```
